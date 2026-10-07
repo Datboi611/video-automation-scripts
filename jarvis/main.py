@@ -21,6 +21,7 @@ from core.musica import Musica
 from core import paneles
 from core.telegram_bot import BotTelegram
 from core.vigilante import Vigilante
+from core.claude_code import ClaudeCode
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -160,6 +161,7 @@ class Jarvis:
                                          agenda=agenda, habilidades=self.habilidades, voz=self.voz)
         self.herramientas.musica = Musica(self.ui)
         self.herramientas.ui = self.ui
+        self.herramientas.claude = ClaudeCode(self.claude_termino)
         self.herramientas.on_resultado = self.mostrar_resultado
         self.cerebro = Cerebro(c, self.herramientas, self.memoria, self.habilidades)
         self.recordatorios.iniciar()
@@ -214,6 +216,17 @@ class Jarvis:
                 self.ui("panel", PANEL[nombre], paneles.desde_texto(resultado))
         except Exception:
             log.exception("No pude armar el panel")
+
+    def claude_termino(self, tarea, resultado, ok):
+        t = self.cfg["tratamiento"]
+        self.ui("panel", "Claude", [{"t": "Terminado" if ok else "Falló", "tono": "ok" if ok else "crit",
+                                     "items": [{"x": l, "sub": "", "tags": []} for l in resultado.splitlines() if l.strip()][:15]
+                                     or [{"x": "(sin respuesta)", "sub": "", "tags": []}]}])
+        resumen = resultado.strip().split("\n")[0][:220] if ok else ""
+        self.decir(f"{t.capitalize()}, Claude terminó: {resumen}" if ok
+                   else f"{t.capitalize()}, la tarea que le encargué a Claude no salió bien.")
+        if self.bot:
+            self.bot.enviar(("✅ Claude terminó:\n" if ok else "❌ Claude falló:\n") + resultado[:3500])
 
     def iniciar_bot(self):
         if not self.bot.activo:

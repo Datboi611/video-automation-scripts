@@ -99,7 +99,9 @@ SPECS = [
     ("consultar_wikipedia", "Resumen de Wikipedia (español).", {"tema": (S, "Tema")}),
     ("clima", "Clima actual y pronóstico.", {"ciudad": (S, "Ciudad")}),
     ("ver_pantalla", "Tus OJOS: mira la pantalla (aunque el usuario esté en otra ventana). Úsalo cuando diga 'esto', 'lo que estoy viendo', 'mi pantalla', 'este error', etc.", {"pregunta": (S, "Qué mirar")}),
-    ("preguntar_a_claude", "Abre Claude (claude.ai) con una pregunta compleja del usuario.", {"pregunta": (S, "Pregunta")}),
+    ("delegar_a_claude", "Encarga a Claude (Claude Code, el plan del usuario) una tarea compleja o larga que haga él mismo en el PC: programar, crear o editar documentos y archivos, investigaciones profundas, automatizaciones. Corre en segundo plano y avisa al terminar.",
+     {"tarea": (S, "Tarea completa y detallada"), "carpeta": (S, "Carpeta de trabajo opcional")}, ["tarea"]),
+    ("preguntar_a_claude", "Abre claude.ai en el navegador con una pregunta (solo si pide verlo él mismo).", {"pregunta": (S, "Pregunta")}),
     ("ejecutar_powershell", "Ejecuta PowerShell. Para cualquier tarea del sistema sin herramienta propia.", {"comando": (S, "Comando")}),
     ("ejecutar_python", "Ejecuta código Python y devuelve lo impreso.", {"codigo": (S, "Código")}),
     ("controlar_volumen", "Volumen del PC.", {"accion": (S, "subir/bajar/silenciar/fijar"), "nivel": ("integer", "0-100")}, ["accion"]),
@@ -137,7 +139,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -190,6 +192,7 @@ class Herramientas:
         self._apps = None
         self.on_resultado = lambda nombre, args, resultado: None
         self.musica = None
+        self.claude = None
 
     def esquemas(self, solo=None):
         out = []
@@ -657,6 +660,10 @@ class Herramientas:
         if getattr(self, "ui", None):
             self.ui("panel", titulo, sec)
         return "Mostrado en el panel."
+
+
+    def delegar_a_claude(self, tarea, carpeta=None):
+        return self.claude.delegar(tarea, carpeta)
 
 
 def _texto_pagina(url, limite):

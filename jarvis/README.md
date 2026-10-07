@@ -57,6 +57,12 @@ Ejemplos:
 - **Correo**: Gmail → myaccount.google.com/apppasswords · iCloud → appleid.apple.com → «Contraseñas de apps». Pon email y esa contraseña en `correo`. El correo de la universidad (Outlook) reenvíalo a tu Gmail.
 - **Recomendado**: clave gratis de **Gemini** (aistudio.google.com/apikey) como respaldo cuando Groq llegue a su límite por minuto.
 
+## JARVIS + tu Claude (Claude Code)
+
+JARVIS le encarga a Claude las tareas grandes (programar, crear documentos, automatizar, investigar a fondo) usando tu plan de Claude. Claude las hace en el PC en segundo plano y JARVIS te avisa (también por Telegram) al terminar.
+1. Doble clic en **`conectar_claude.bat`** (instala Claude Code e inicia sesión con tu cuenta de Claude, solo una vez).
+2. Pídele a JARVIS: «encárgale a Claude que…» o «hazme un documento con…».
+
 ## JARVIS en tu iPhone (Telegram, gratis)
 
 1. En Telegram, abre **@BotFather** → `/newbot` → ponle nombre (ej. *Jarvis de Diego*) y un usuario que termine en `bot`. Copia el **token**.
