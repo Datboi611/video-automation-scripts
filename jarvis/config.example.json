@@ -13,7 +13,7 @@
       {
         "nombre": "groq",
         "api_key": "",
-        "modelo": "llama-3.3-70b-versatile"
+        "modelo": "meta-llama/llama-4-scout-17b-16e-instruct"
       },
       {
         "nombre": "gemini",
@@ -33,11 +33,12 @@
     "modelo_local": "small"
   },
   "voz": {
-    "_ayuda": "Voces naturales: en-US-AndrewMultilingualNeural, en-US-BrianMultilingualNeural (hablan español e inglés), es-MX-JorgeNeural, es-ES-AlvaroNeural. motor: edge u offline",
+    "_ayuda": "Prueba voces con probar_voces.bat. Mayordomo: es-ES-AlvaroNeural / en-GB-RyanNeural. tono: '-6Hz' más grave",
     "motor": "edge",
-    "voz": "en-US-AndrewMultilingualNeural",
-    "voz_en": "en-US-AndrewMultilingualNeural",
-    "velocidad": "+8%"
+    "voz": "es-ES-AlvaroNeural",
+    "voz_en": "en-GB-RyanNeural",
+    "velocidad": "-2%",
+    "tono": "-6Hz"
   },
   "telefono": {
     "_ayuda": "ntfy_tema: nombre largo y secreto (ej. jarvis-diego-8f3k2q). telegram_usuario: tu @usuario de Telegram",
@@ -49,7 +50,7 @@
   "_ayuda_reposo": "Minutos sin hablar antes de dormirse. Despierta con 'Jarvis', doble aplauso o clic",
   "minutos_reposo": 30,
   "microfono": null,
-  "_version": 3,
+  "_version": 4,
   "agenda": {
     "_ayuda": "google_calendar_ics: Google Calendar > Configuración > tu calendario > 'Dirección secreta en formato iCal'. todoist_token: Todoist > Configuración > Integraciones > Desarrollador",
     "google_calendar_ics": "",
@@ -68,5 +69,7 @@
     }
   ],
   "segundos_silencio": 1.6,
-  "_ayuda_correo": "Usa una 'contraseña de aplicación': Gmail (myaccount.google.com/apppasswords) o iCloud (appleid.apple.com). Correo de universidad Outlook: reenvíalo a tu Gmail."
+  "_ayuda_correo": "Usa una 'contraseña de aplicación': Gmail (myaccount.google.com/apppasswords) o iCloud (appleid.apple.com). Correo de universidad Outlook: reenvíalo a tu Gmail.",
+  "interrumpir": true,
+  "vocabulario": ""
 }

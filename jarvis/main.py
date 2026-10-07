@@ -67,6 +67,48 @@ PANEL = {  # herramienta -> título del menú lateral donde se muestra su result
 }
 
 
+SITIOS = {"google": "google.com", "youtube": "youtube.com", "gmail": "mail.google.com", "correo": "mail.google.com",
+          "whatsapp web": "web.whatsapp.com", "netflix": "netflix.com", "canvas": "utah.instructure.com",
+          "todoist": "app.todoist.com", "notion": "notion.so", "claude": "claude.ai", "chatgpt": "chatgpt.com",
+          "calendario": "calendar.google.com", "google calendar": "calendar.google.com", "drive": "drive.google.com",
+          "instagram": "instagram.com", "tiktok": "tiktok.com", "facebook": "facebook.com", "x": "x.com",
+          "shopify": "admin.shopify.com", "plancitope": "plancitope.com"}
+
+
+def accion_rapida(texto, herr, cfg):
+    """Órdenes simples que se ejecutan al instante, sin gastar IA."""
+    t = re.sub(r"^(oye |hey |ok )?jarvis[,.]?\s*", "", texto.lower()).strip(" .!¡?¿")
+    t = re.sub(r"\s*(por favor|porfa|please)$", "", t)
+    j = cfg["tratamiento"]
+    m = re.match(r"^(?:puedes |podr[ií]as )?(?:abre|abrir|[aá]breme|open)\s+(?:el |la |los |mi |un )?(.+)$", t)
+    if m and len(m.group(1)) < 40:
+        destino = m.group(1).strip()
+        if destino in SITIOS or re.search(r"\.(com|net|org|io|ai|edu|pe)\b", destino):
+            herr.ejecutar("abrir_web", {"url": SITIOS.get(destino, destino)})
+        else:
+            r = herr.ejecutar("abrir_aplicacion", {"nombre": destino})
+            if r.startswith("No encontr"):
+                return None  # que lo resuelva la IA
+        return f"Abriendo {destino}, {j}."
+    m = re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:algo de |m[uú]sica de |la canci[oó]n |canciones de |m[uú]sica )?(.+)$", t)
+    if m and herr.musica and not re.search(r"\b(alarma|recordatorio|timer|temporizador)\b", t):
+        r = herr.ejecutar("poner_musica", {"busqueda": m.group(1), "varias": True})
+        return r if r.startswith("No") else f"Enseguida, {j}. {r}"
+    if re.fullmatch(r"(pausa|pausar|pausa la m[uú]sica|para la m[uú]sica|det[eé]n la m[uú]sica|stop|silencio)", t):
+        herr.ejecutar("controlar_musica", {"accion": "pausar"})
+        return "Hecho."
+    if re.fullmatch(r"(contin[uú]a|reanuda|sigue)( la m[uú]sica)?|play", t):
+        herr.ejecutar("controlar_musica", {"accion": "reanudar"})
+        return "Reanudando."
+    if re.fullmatch(r"(siguiente|la siguiente|siguiente canci[oó]n|next|cambia de canci[oó]n|otra canci[oó]n)", t):
+        return herr.ejecutar("controlar_musica", {"accion": "siguiente"})
+    m = re.match(r"^(?:marca|marcar|completa|tacha)\s+(.+?)\s+como\s+(?:hech[ao]|completad[ao]|terminad[ao]|lista|listo)$", t) \
+        or re.match(r"^(?:ya )?(?:hice|termin[eé]|complet[eé])\s+(?:el |la |los |las )?(.+)$", t)
+    if m:
+        return herr.ejecutar("marcar_hecho", {"texto": m.group(1)})
+    return None
+
+
 class Jarvis:
     def __init__(self):
         self.cfg = config.cargar()
@@ -113,6 +155,7 @@ class Jarvis:
         self.herramientas = Herramientas(self.memoria, self.recordatorios, self.telefono, cfg=c,
                                          agenda=agenda, habilidades=self.habilidades, voz=self.voz)
         self.herramientas.musica = Musica(self.ui)
+        self.herramientas.ui = self.ui
         self.herramientas.on_resultado = self.mostrar_resultado
         self.cerebro = Cerebro(c, self.herramientas, self.memoria, self.habilidades)
         self.recordatorios.iniciar()
@@ -122,6 +165,7 @@ class Jarvis:
             from core.oido import Oido
             self.oido = Oido(c)
             self.escucha = Escucha(c, self.estado, self.nivel, self.comando_de_voz, self.despertar)
+            self.escucha.on_interrupcion = self.voz.detener
             modos = ["di «" + c["activacion"]["palabra"].capitalize() + "»" if self.escucha.rec else None,
                      "aplaude dos veces" if c["activacion"]["aplausos"] else None, "toca la esfera"]
             self.ui("setHint", f"Te escucho siempre · tras {c['minutos_reposo']} min sin hablar descanso; "
@@ -129,14 +173,13 @@ class Jarvis:
         except Exception as e:
             log.exception("Micrófono no disponible")
             self.ui("setHint", "Micrófono no disponible. Puedes escribirme.")
-            self.ui("mostrarChat")
+            self.ui("pedirTexto", "Escríbeme tu orden…")
 
         if c["telefono"]["control_remoto"]:
             self.telefono.escuchar_ordenes(self.orden_remota)
 
         if not self.cerebro.proveedores:
-            self.ui("addMsg", "sistema", "Falta tu clave gratuita de Groq en config.json.")
-            self.ui("mostrarChat")
+            self.ui("pedirTexto", "Falta tu clave de Groq en config.json")
         h = dt.datetime.now().hour
         saludo = "Buenos días" if 5 <= h < 12 else "Buenas tardes" if h < 20 else "Buenas noches"
         self.decir(f"{saludo}, {c['tratamiento']}. Todos los sistemas operativos. Le escucho.")
@@ -146,7 +189,7 @@ class Jarvis:
             log.exception("No pude abrir el micrófono")
             self.escucha = None
             self.ui("setHint", "Micrófono no disponible. Puedes escribirme.")
-            self.ui("mostrarChat")
+            self.ui("pedirTexto", "Escríbeme tu orden…")
             self.estado("reposo")
 
     def mostrar_resultado(self, nombre, args, resultado):
@@ -156,7 +199,7 @@ class Jarvis:
             self.ui("panel", "Recordatorios", self.herramientas.listar_recordatorios())
         elif nombre in ("todoist_agregar", "todoist_completar"):
             self.ui("panel", "Todoist", self.herramientas.todoist())
-        elif nombre in ("pendiente_agregar", "pendiente_completar"):
+        elif nombre in ("pendiente_agregar", "marcar_hecho"):
             self.ui("panel", "Pendientes", self.herramientas.pendientes())
 
     # ---------- Flujo principal ----------
@@ -184,7 +227,7 @@ class Jarvis:
         self.ui("proceso", pid, texto, "en curso")
         error = False
         try:
-            respuesta = respuesta_rapida(texto, idioma, self.cfg)
+            respuesta = respuesta_rapida(texto, idioma, self.cfg) or accion_rapida(texto, self.herramientas, self.cfg)
             if not respuesta:
                 self.estado("pensando")
                 guardar_preferencia(texto, self.memoria)
@@ -198,9 +241,6 @@ class Jarvis:
         finally:
             self.activos -= 1
         self.ui("proceso", pid, texto, "error" if error else "hecho")
-        if error:
-            self.ui("addMsg", "sistema", "Hubo un error. Repítelo o escríbeme aquí.")
-            self.ui("mostrarChat")
         if hablar:
             self.decir(respuesta, idioma)
         else:
@@ -215,6 +255,9 @@ class Jarvis:
             self.estado("escuchando")
             return False
         limpio = texto.lower().strip(" .!¡?¿,")
+        musica = self.herramientas.musica
+        if musica and musica.sonando and "jarvis" not in limpio:
+            return False  # con música sonando, el micrófono oye la canción: solo respondo si me llaman
         if any(f in limpio for f in ("descansa", "duérmete", "duermete", "modo reposo", "go to sleep", "sleep mode")):
             self.ui("addMsg", "usuario", texto)
             self.decir("Entrando en reposo. Aplauda o diga Jarvis cuando me necesite." if idioma == "es"
@@ -283,8 +326,12 @@ class Api:
 
     def musica(self, accion):
         m = getattr(getattr(self._j, "herramientas", None), "musica", None)
-        if m and accion == "siguiente":
+        if not m:
+            return
+        if accion == "siguiente":
             threading.Thread(target=m.siguiente, daemon=True).start()
+        else:
+            m.sonando = accion in ("reanudar", "play")
 
     def info(self):
         import psutil

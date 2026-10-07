@@ -1,5 +1,6 @@
 """Música en segundo plano dentro de JARVIS (YouTube vía yt-dlp, se reproduce en la propia interfaz)."""
 import logging
+import re
 import urllib.parse
 import webbrowser
 
@@ -11,6 +12,7 @@ class Musica:
         self.ui = ui
         self.cola = []
         self.actual = None
+        self.sonando = False
 
     def _buscar(self, busqueda, n=1):
         import yt_dlp
@@ -26,6 +28,7 @@ class Musica:
         if not pistas:
             return f"No encontré '{busqueda}' en YouTube."
         self.actual, self.cola = pistas[0], pistas[1:]
+        self.sonando = True
         self.ui("musica", self.actual)
         return f"Reproduciendo {self.actual['titulo']}."
 
@@ -40,6 +43,10 @@ class Musica:
         accion = accion.lower()
         if accion in ("siguiente", "next"):
             return self.siguiente()
+        if re.search(r"paus|deten|stop|quita|apaga", accion):
+            self.sonando = False
+        elif re.search(r"reanud|play|contin", accion):
+            self.sonando = True
         self.ui("musicaControl", accion, nivel)
         return "Hecho."
 

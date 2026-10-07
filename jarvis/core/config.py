@@ -19,14 +19,15 @@ DEFAULTS = {
     },
     "llm": {
         "proveedores": [
-            {"nombre": "groq", "api_key": "", "modelo": "llama-3.3-70b-versatile"},
+            {"nombre": "groq", "api_key": "", "modelo": "meta-llama/llama-4-scout-17b-16e-instruct"},
             {"nombre": "gemini", "api_key": "", "modelo": "gemini-2.5-flash"},
             {"nombre": "ollama", "modelo": "qwen2.5:7b", "url": "http://localhost:11434/v1"},
         ]
     },
     "stt": {"motor": "auto", "modelo_local": "small"},
-    "voz": {"motor": "edge", "voz": "en-US-AndrewMultilingualNeural", "voz_en": "en-US-AndrewMultilingualNeural",
-            "velocidad": "+8%"},
+    # Mayordomo: español castellano formal y británico en inglés, algo más grave y pausado
+    "voz": {"motor": "edge", "voz": "es-ES-AlvaroNeural", "voz_en": "en-GB-RyanNeural",
+            "velocidad": "-2%", "tono": "-6Hz"},
     "agenda": {"google_calendar_ics": "", "todoist_token": ""},
     "telefono": {
         "ntfy_servidor": "https://ntfy.sh",
@@ -36,6 +37,9 @@ DEFAULTS = {
     },
     "minutos_reposo": 30,
     "segundos_silencio": 1.6,
+    "interrumpir": True,
+    "factor_interrupcion": 2.8,
+    "vocabulario": "",
     "microfono": None,
 }
 
@@ -49,8 +53,10 @@ ENV_KEYS = {"groq": "GROQ_API_KEY", "gemini": "GEMINI_API_KEY"}
 
 # Modelos de respaldo dentro del mismo proveedor (si uno falla o se retira, prueba el siguiente)
 RESPALDO_MODELOS = {
-    "groq": ["llama-3.3-70b-versatile", "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
-    "gemini": ["gemini-2.5-flash", "gemini-2.0-flash"],
+    # ordenados por cupo diario gratis y velocidad (scout: 500K tokens/día; 70b: solo 100K/día)
+    "groq": ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-20b",
+             "llama-3.1-8b-instant"],
+    "gemini": ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
 }
 
 
@@ -67,7 +73,13 @@ def _merge(base, extra):
 def _migrar(usuario, ruta):
     """Actualiza un config.json viejo a los nuevos valores por defecto."""
     v = usuario.get("_version", 1)
-    if v >= 3:
+    if v >= 4:
+        return
+    if v == 3:
+        _a_v4(usuario)
+        usuario["_version"] = 4
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if usuario.get("tratamiento") == "señor":
         usuario["tratamiento"] = "jefe"
@@ -81,9 +93,25 @@ def _migrar(usuario, ruta):
     if voz.get("velocidad") in (None, "+8%", "+25%"):
         voz["velocidad"] = "+8%"
     usuario.setdefault("agenda", {"google_calendar_ics": "", "todoist_token": ""})
-    usuario["_version"] = 3
+    _a_v4(usuario)
+    usuario["_version"] = 4
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
+
+
+def _a_v4(usuario):
+    """v4: modelo con más cupo diario y voz de mayordomo."""
+    for p in usuario.get("llm", {}).get("proveedores", []):
+        if p.get("nombre") == "groq" and p.get("modelo") == "llama-3.3-70b-versatile":
+            p["modelo"] = "meta-llama/llama-4-scout-17b-16e-instruct"
+    voz = usuario.setdefault("voz", {})
+    if voz.get("voz") in (None, "en-US-AndrewMultilingualNeural", "es-MX-JorgeNeural"):
+        voz["voz"] = "es-ES-AlvaroNeural"
+    if voz.get("voz_en") in (None, "en-US-AndrewMultilingualNeural", "en-GB-RyanNeural"):
+        voz["voz_en"] = "en-GB-RyanNeural"
+    if voz.get("velocidad") in (None, "+8%", "+25%"):
+        voz["velocidad"] = "-2%"
+    voz.setdefault("tono", "-6Hz")
 
 
 def cargar():

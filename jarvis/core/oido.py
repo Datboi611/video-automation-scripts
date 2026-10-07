@@ -15,8 +15,8 @@ ALUCINACIONES = (
 )
 
 
-VOCABULARIO = ("Jarvis, Diego. Todoist, Google Calendar, YouTube, Apple Music, Pill&Go, Ezma Shop, "
-               "WhatsApp, Chrome. ¿Qué tengo pendiente hoy? Pon música. Recuérdame.")
+VOCABULARIO = ("Jarvis, Diego. Todoist, Google Calendar, YouTube, Apple Music, Pill&Go, Ezma Shop, Plancitope, "
+               "Canvas, Notion, WhatsApp, Chrome, pestaña. ¿Qué tengo pendiente hoy? Pon música. Recuérdame.")
 
 
 def limpiar_audio(audio):
@@ -50,6 +50,9 @@ class Oido:
             self.motor = "groq" if self.key_groq else "local"
         self._local = None
         self._groq = None
+        global VOCABULARIO
+        if cfg.get("vocabulario"):
+            VOCABULARIO = cfg["vocabulario"] + ". " + VOCABULARIO
 
     def _transcribir_groq(self, audio):
         if self._groq is None:

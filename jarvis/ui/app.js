@@ -139,7 +139,12 @@ window.J = {
   setLevel(v) { nivelObj = Math.max(0, Math.min(1, v)); },
   setStatus(txt) { $("estado").textContent = txt.toUpperCase(); },
   setHint(txt) { $("hint").textContent = txt; },
-  mostrarChat() { $("chat").hidden = false; },
+  mostrarChat() {},
+  pedirTexto(motivo) {  // la caja de texto solo aparece cuando JARVIS necesita que escribas algo
+    $("entrada").placeholder = motivo || "Escribe aquí…";
+    $("chat").hidden = false;
+    $("entrada").focus();
+  },
   proceso(id, texto, paso) {
     const ul = $("procesos");
     ul.querySelector(".vacio")?.remove();
@@ -203,7 +208,7 @@ window.J = {
 
 const api = () => window.pywebview && window.pywebview.api;
 let volMusica = 0.6;
-$("toggle-chat").addEventListener("click", () => { $("chat").hidden = !$("chat").hidden; if (!$("chat").hidden) $("entrada").focus(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("chat").hidden = true; });
 $("p-play").addEventListener("click", () => J.musicaControl($("audio").paused ? "reanudar" : "pausar"));
 $("p-stop").addEventListener("click", () => J.musicaControl("detener"));
 $("p-next").addEventListener("click", () => api() && api().musica("siguiente"));
@@ -214,6 +219,7 @@ $("form").addEventListener("submit", (e) => {
   const t = $("entrada").value.trim();
   if (!t) return;
   $("entrada").value = "";
+  $("chat").hidden = true;
   api() ? api().enviar(t) : J.addMsg("usuario", t);
 });
 canvas.addEventListener("click", () => api() && api().activar());

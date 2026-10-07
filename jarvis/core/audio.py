@@ -1,4 +1,5 @@
 """Micrófono: palabra de activación (Vosk, offline), doble aplauso y grabación de órdenes."""
+import collections
 import json
 import logging
 import queue
@@ -61,7 +62,11 @@ class Escucha:
         self.cfg = cfg
         self.on_estado, self.on_nivel, self.on_comando = on_estado, on_nivel, on_comando
         self.on_despertar = on_despertar
+        self.on_interrupcion = lambda: None
         self.ultimo = time.time()
+        self._eco = 0.02
+        self._eco_frames = 0
+        self._previo = collections.deque(maxlen=25)
         self.cola = queue.Queue()
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
@@ -104,8 +109,32 @@ class Escucha:
 
     # --- interno ---
     def _callback(self, datos, frames, tiempo, estado):
+        frame = datos[:, 0].copy()
         if not self.silencio.is_set():
-            self.cola.put(datos[:, 0].copy())
+            self._eco_frames = 0
+            self.cola.put(frame)
+            return
+        # JARVIS está hablando: el micrófono oye su voz (eco). Si aparece una voz claramente más
+        # fuerte que ese eco durante ~0.25 s, es el usuario interrumpiendo.
+        x = frame.astype(np.float32) / 32768
+        rms = float(np.sqrt(np.mean(x * x)))
+        self._previo.append(frame)
+        if not self.cfg.get("interrumpir", True):
+            return
+        umbral = max(self.ruido * 6, self._eco * self.cfg.get("factor_interrupcion", 2.8), 0.03)
+        if rms > umbral:
+            self._eco_frames += 1
+        else:
+            self._eco_frames = max(0, self._eco_frames - 1)
+            self._eco = 0.97 * self._eco + 0.03 * rms  # nivel típico del eco
+        if self._eco_frames >= 8:
+            self._eco_frames = 0
+            log.info("Interrupción del usuario detectada")
+            self.silencio.clear()
+            for f in self._previo:  # no perder el inicio de lo que dijo
+                self.cola.put(f)
+            self._previo.clear()
+            self.on_interrupcion()
 
     def _vaciar(self):
         while not self.cola.empty():

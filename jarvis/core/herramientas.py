@@ -75,7 +75,9 @@ SPECS = [
      {"proyecto": (S, "Proyecto opcional"), "solo_urgentes": ("boolean", "Solo vencidos/próximos/alta prioridad")}, []),
     ("pendiente_agregar", "Agrega un pendiente personal.",
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
-    ("pendiente_completar", "Marca un pendiente personal como hecho.", {"texto": (S, "Parte del texto")}),
+    ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
+    ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
+     {"motivo": (S, "Qué necesitas que escriba")}),
     ("correo", "Lee correos (personal y de la universidad): no leídos o buscando un texto.",
      {"cuenta": (S, "personal/universidad, opcional"), "buscar": (S, "Texto a buscar, opcional"),
       "solo_no_leidos": ("boolean", "Solo no leídos (por defecto sí)")}, []),
@@ -130,13 +132,13 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
                r"cita|reuni|examen|quiz|homework|schedule|task|remind|plan|organiza|proyecto|hecho|termin|complet",
                {"resumen_del_dia", "calendario", "agregar_evento", "todoist", "todoist_agregar", "todoist_completar",
-                "pendientes", "pendiente_agregar", "pendiente_completar", "crear_recordatorio", "listar_recordatorios",
+                "pendientes", "pendiente_agregar", "marcar_hecho", "crear_recordatorio", "listar_recordatorios",
                 "borrar_recordatorio"}),
     "correo": (r"correo|mail|inbox|bandeja|mensaje de|escrib.* a |responde", {"correo", "enviar_correo"}),
     "musica": (r"m[uú]sica|canci|pon |reproduc|playlist|youtube|apple|spotify|pausa|reanuda|volumen|sube|baja|"
@@ -475,8 +477,26 @@ class Herramientas:
     def pendiente_agregar(self, texto, proyecto="General", fecha=None, prioridad="media"):
         return self.agenda["pendientes"].agregar(texto, proyecto, fecha, prioridad)
 
-    def pendiente_completar(self, texto):
-        return self.agenda["pendientes"].completar(texto)
+    def marcar_hecho(self, texto):
+        """Completa la tarea en Todoist (si está conectado) y en los pendientes personales."""
+        hechos = []
+        tod = self.agenda.get("todoist")
+        if tod and tod.token:
+            try:
+                r = tod.completar(texto)
+                if not r.startswith("No encontr"):
+                    hechos.append(r)
+            except Exception as e:
+                log.warning("Todoist completar falló: %s", e)
+        r = self.agenda["pendientes"].completar(texto)
+        if not r.startswith("No encontr"):
+            hechos.append(r)
+        return " ".join(hechos) or f"No encontré ninguna tarea con '{texto}'."
+
+    def pedir_texto(self, motivo="Escríbeme"):
+        if getattr(self, "ui", None):
+            self.ui("pedirTexto", motivo)
+        return "Abrí una caja de texto para que el usuario escriba. Dile brevemente qué necesitas."
 
     # ---------- Visión, Claude, archivos ----------
     def ver_pantalla(self, pregunta="¿Qué hay en la pantalla?"):
