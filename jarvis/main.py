@@ -426,7 +426,8 @@ class Jarvis:
                    "Revise que la dirección Wi-Fi privada esté en modo fija.")
         elif campo in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero"):
             if campo in ("twilio_numero", "mi_numero"):
-                valor = "+" + re.sub(r"\D", "", valor)
+                from core.telefono import normalizar_numero
+                valor = normalizar_numero(valor)
             c["telefono"][campo] = valor
             config.guardar_valor(["telefono", campo], valor)
             siguiente = {"twilio_sid": "twilio_token", "twilio_token": "twilio_numero", "twilio_numero": "mi_numero"}.get(campo)

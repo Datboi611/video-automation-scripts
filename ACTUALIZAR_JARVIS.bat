@@ -26,8 +26,10 @@ echo.
 rem 2) Cerrar JARVIS si esta abierto
 taskkill /f /im pythonw.exe >nul 2>nul
 
-rem 3) Copiar todo (incluye tu config.json) sin tocar el entorno ni tus datos
+rem 3) Copiar todo sin tocar el entorno ni tus datos; luego unir tu config anterior con la nueva
+if exist "%DESTINO%\config.json" copy /y "%DESTINO%\config.json" "%TEMP%\jarvis_config_anterior.json" >nul
 robocopy "%ORIGEN%" "%DESTINO%" /E /XD .venv datos /NFL /NDL /NJH /NJS /NP >nul
+if exist "%TEMP%\jarvis_config_anterior.json" if exist "%DESTINO%\.venv\Scripts\python.exe" "%DESTINO%\.venv\Scripts\python.exe" "%DESTINO%\fusionar_config.py" "%DESTINO%\config.json" "%TEMP%\jarvis_config_anterior.json"
 echo [OK] Archivos actualizados (incluida tu configuracion).
 
 rem 4) Instalar lo que falte

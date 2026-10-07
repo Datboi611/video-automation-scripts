@@ -4,6 +4,7 @@
 """
 import json
 import logging
+import re
 import threading
 import time
 
@@ -12,9 +13,22 @@ import requests
 log = logging.getLogger("jarvis")
 
 
+def normalizar_numero(numero):
+    """+1 por defecto (EE. UU.) si escribió el número sin código de país."""
+    d = re.sub(r"\D", "", numero or "")
+    if not d:
+        return ""
+    if len(d) == 10:
+        d = "1" + d
+    return "+" + d
+
+
 class Telefono:
     def __init__(self, cfg):
         t = cfg["telefono"]
+        for k in ("twilio_numero", "mi_numero"):
+            if t.get(k):
+                t[k] = normalizar_numero(t[k])
         self.cfg_tel = t
         self.servidor = t["ntfy_servidor"].rstrip("/")
         self.tema = t["ntfy_tema"].strip()
