@@ -57,6 +57,12 @@ Ejemplos:
 - **Correo**: Gmail → myaccount.google.com/apppasswords · iCloud → appleid.apple.com → «Contraseñas de apps». Pon email y esa contraseña en `correo`. El correo de la universidad (Outlook) reenvíalo a tu Gmail.
 - **Recomendado**: clave gratis de **Gemini** (aistudio.google.com/apikey) como respaldo cuando Groq llegue a su límite por minuto.
 
+## Correo y Canvas vigilados (segundo plano)
+
+- **Correo** (cada 15 min): solo te avisa de lo importante (profes, universidad, trámites, clientes…). Dile «conecta mi correo» y escribe tu correo + una *contraseña de aplicación* (Gmail: myaccount.google.com/apppasswords · iCloud: appleid.apple.com).
+- **Canvas** (cada 30 min): tareas nuevas, anuncios, notas publicadas y entregas faltantes. Dile «conecta Canvas» y pega un token (Canvas → Cuenta → Configuración → «+ Nuevo token de acceso»). También puedes pedirle «¿qué tengo en Canvas?», «abre Canvas de física», «¿hay anuncios nuevos?».
+- Ajustes en `config.json` → `vigilante` (`correo_cada_min`, `canvas_cada_min`, `correo_importante` para decirle qué consideras importante).
+
 ## JARVIS + tu Claude (Claude Code)
 
 JARVIS le encarga a Claude las tareas grandes (programar, crear documentos, automatizar, investigar a fondo) usando tu plan de Claude. Claude las hace en el PC en segundo plano y JARVIS te avisa (también por Telegram) al terminar.

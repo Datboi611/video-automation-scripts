@@ -22,6 +22,7 @@ from core import paneles
 from core.telegram_bot import BotTelegram
 from core.vigilante import Vigilante
 from core.claude_code import ClaudeCode
+from core.canvas import Canvas
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -155,6 +156,7 @@ class Jarvis:
             "todoist": Todoist(c["agenda"]["todoist_token"]),
             "pendientes": Pendientes(os.path.join(config.DATOS, "pendientes.json")),
             "correo": Correo(c.get("correo", [])),
+            "canvas": Canvas(c["agenda"].get("canvas_url"), c["agenda"].get("canvas_token")),
         }
         self.habilidades = Habilidades(os.path.join(config.BASE, "habilidades"))
         self.herramientas = Herramientas(self.memoria, self.recordatorios, self.telefono, cfg=c,
@@ -265,6 +267,33 @@ class Jarvis:
             self.iniciar_bot()
             msg = (f"Bot conectado, {c['tratamiento']}. Envíele desde su iPhone el código que le muestro en el panel: "
                    f"{' '.join(self.bot.codigo or '')}.")
+        elif campo == "canvas_token":
+            c["agenda"]["canvas_token"] = valor
+            config.guardar_valor(["agenda", "canvas_token"], valor)
+            cv = self.herramientas.agenda["canvas"]
+            cv.token, cv._cursos = valor, None
+            try:
+                n = len(cv.cursos())
+                msg = f"Canvas conectado, {c['tratamiento']}. Vigilo sus {n} cursos; ninguna tarea nueva pasará desapercibida."
+            except Exception:
+                msg = "Guardé el token, pero Canvas lo rechazó. Revise que esté completo."
+        elif campo in ("correo_email", "correo_app_password"):
+            cuentas = c.setdefault("correo", [])
+            if not cuentas:
+                cuentas.append({"nombre": "personal", "email": "", "app_password": ""})
+            cuentas[0]["email" if campo == "correo_email" else "app_password"] = valor
+            config.guardar_valor(["correo"], cuentas)
+            self.herramientas.agenda["correo"] = Correo(cuentas)
+            if campo == "correo_email":
+                self.herramientas.pedir_dato("correo_app_password")
+                msg = ("Anotado. Ahora pegue la contraseña de aplicación: en Gmail, myaccount.google.com/apppasswords; "
+                       "en iCloud, appleid.apple.com, contraseñas de apps.")
+            else:
+                try:
+                    self.herramientas.agenda["correo"].cuentas[0].buscar("UNSEEN", 1)
+                    msg = f"Correo conectado, {c['tratamiento']}. Le avisaré solo de lo que importe."
+                except Exception:
+                    msg = "El correo rechazó esa contraseña. Asegúrese de usar una contraseña de aplicación, no la normal."
         elif campo == "telegram_usuario":
             u = valor if valor.startswith("@") else "@" + valor
             c["telefono"]["telegram_usuario"] = u

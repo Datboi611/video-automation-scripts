@@ -56,7 +56,9 @@
   "agenda": {
     "_ayuda": "google_calendar_ics: Google Calendar > Configuración > tu calendario > 'Dirección secreta en formato iCal'. todoist_token: Todoist > Configuración > Integraciones > Desarrollador",
     "google_calendar_ics": "",
-    "todoist_token": ""
+    "todoist_token": "",
+    "canvas_url": "https://utah.instructure.com",
+    "canvas_token": ""
   },
   "correo": [
     {
@@ -92,6 +94,9 @@
     "silencio": [
       "23:00",
       "07:30"
-    ]
+    ],
+    "correo_cada_min": 15,
+    "canvas_cada_min": 30,
+    "correo_importante": ""
   }
 }

@@ -77,12 +77,15 @@ SPECS = [
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
     ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
-     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_usuario"),
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_usuario | canvas_token | correo_email | correo_app_password"),
       "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
     ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
     ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
      {"motivo": (S, "Qué necesitas que escriba")}),
+    ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
+     {"que": (S, "pendientes | anuncios | notas | cursos")}, []),
+    ("canvas_abrir", "Abre Canvas en el navegador (un curso o una tarea concreta).", {"busqueda": (S, "Curso o tarea, opcional")}, []),
     ("correo", "Lee correos (personal y de la universidad): no leídos o buscando un texto.",
      {"cuenta": (S, "personal/universidad, opcional"), "buscar": (S, "Texto a buscar, opcional"),
       "solo_no_leidos": ("boolean", "Solo no leídos (por defecto sí)")}, []),
@@ -148,6 +151,8 @@ CATEGORIAS = {
                 "pendientes", "pendiente_agregar", "marcar_hecho", "crear_recordatorio", "listar_recordatorios",
                 "borrar_recordatorio"}),
     "correo": (r"correo|mail|inbox|bandeja|mensaje de|escrib.* a |responde", {"correo", "enviar_correo"}),
+    "canvas": (r"canvas|curso|clase|profe|nota|calificaci|entrega|assignment|anuncio|universidad|homework|quiz|tarea",
+               {"canvas", "canvas_abrir"}),
     "musica": (r"m[uú]sica|canci|pon |reproduc|playlist|youtube|apple|spotify|pausa|reanuda|volumen|sube|baja|"
                r"siguiente|anterior|play|song|music|det[eé]n|calla|silencio",
                {"poner_musica", "controlar_musica", "apple_music", "controlar_multimedia", "controlar_volumen"}),
@@ -596,6 +601,9 @@ class Herramientas:
 
     # ---------- Correo ----------
     def correo(self, cuenta=None, buscar=None, solo_no_leidos=True):
+        if not self.agenda["correo"]._elegir():
+            self.pedir_dato("correo_email")
+            return "El correo no está conectado: abrí la barra para que escriba su correo. Díselo brevemente."
         return self.agenda["correo"].resumen(cuenta, solo_no_leidos, buscar)
 
     def enviar_correo(self, para, asunto, cuerpo, cuenta=None):
@@ -641,7 +649,10 @@ class Herramientas:
                   "groq_api_key": "Pega tu clave de Groq",
                   "elevenlabs_api_key": "Pega tu clave de ElevenLabs (elevenlabs.io → API Keys)",
                   "telegram_bot_token": "Pega el token de tu bot de Telegram (te lo da @BotFather)",
-                  "telegram_usuario": "Escribe tu @usuario de Telegram (para las llamadas)"}
+                  "telegram_usuario": "Escribe tu @usuario de Telegram (para las llamadas)",
+                  "canvas_token": "Pega tu token de Canvas (Cuenta → Configuración → Nuevo token de acceso)",
+                  "correo_email": "Escribe tu correo personal (Gmail o iCloud)",
+                  "correo_app_password": "Pega la contraseña de aplicación de tu correo"}
         if campo not in textos:
             return f"Campo no válido. Opciones: {', '.join(textos)}."
         if getattr(self, "ui", None):
@@ -662,6 +673,30 @@ class Herramientas:
         return "Mostrado en el panel."
 
 
+    def canvas(self, que="pendientes"):
+        cv = self.agenda.get("canvas")
+        if not cv or not cv.token:
+            self.pedir_dato("canvas_token")
+            return "Canvas no está conectado: abrí la barra para que pegue su token. Díselo brevemente."
+        return cv.texto(que)
+
+    def canvas_abrir(self, busqueda=None):
+        return self.agenda["canvas"].abrir(busqueda)
+
+    def delegar_a_claude(self, tarea, carpeta=None):
+        return self.claude.delegar(tarea, carpeta)
+
+
+    def canvas(self, que="pendientes"):
+        cv = self.agenda.get("canvas")
+        if not cv or not cv.token:
+            self.pedir_dato("canvas_token")
+            return "Canvas no está conectado: abrí la barra para que pegue su token. Díselo brevemente."
+        return cv.texto(que)
+
+    def canvas_abrir(self, busqueda=None):
+        return self.agenda["canvas"].abrir(busqueda)
+
     def delegar_a_claude(self, tarea, carpeta=None):
         return self.claude.delegar(tarea, carpeta)
 
@@ -673,3 +708,4 @@ def _texto_pagina(url, limite):
     for t in sopa(["script", "style", "nav", "footer", "header", "aside", "form"]):
         t.decompose()
     return " ".join(sopa.get_text(" ").split())[:limite]
+

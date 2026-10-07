@@ -29,7 +29,7 @@ DEFAULTS = {
     # Voz natural: sin alterar el tono (bajarlo distorsiona). motor "elevenlabs" = la más humana (opcional).
     "voz": {"motor": "edge", "voz": "es-ES-AlvaroNeural", "voz_en": "en-GB-RyanNeural",
             "velocidad": "+0%", "tono": "+0Hz", "elevenlabs_api_key": "", "elevenlabs_voz": "JBFqnCBsd6RMkjVDRZzb"},
-    "agenda": {"google_calendar_ics": "", "todoist_token": ""},
+    "agenda": {"google_calendar_ics": "", "todoist_token": "", "canvas_url": "https://utah.instructure.com", "canvas_token": ""},
     "telefono": {
         "ntfy_servidor": "https://ntfy.sh",
         "ntfy_tema": "",
@@ -38,7 +38,8 @@ DEFAULTS = {
     },
     "telegram_bot": {"token": "", "chat_id": ""},
     "vigilante": {"resumen_matutino": "08:00", "revisiones": ["14:00", "19:00"], "aviso_eventos_min": 30,
-                  "llamar_si_pendiente": True, "hora_llamada": "20:30", "silencio": ["23:00", "07:30"]},
+                  "llamar_si_pendiente": True, "hora_llamada": "20:30", "silencio": ["23:00", "07:30"],
+                  "correo_cada_min": 15, "canvas_cada_min": 30, "correo_importante": ""},
     "idioma": "es",  # "es" = siempre español; "auto" = español o inglés según cómo hables
     "minutos_reposo": 30,
     "segundos_silencio": 1.6,

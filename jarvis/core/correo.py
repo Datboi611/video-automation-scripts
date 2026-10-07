@@ -64,6 +64,8 @@ class Cuenta:
                 _, datos = m.fetch(i, "(BODY.PEEK[])")
                 msg = email.message_from_bytes(datos[0][1])
                 correos.append({
+                    "id": _dec(msg.get("Message-ID")) or f"{self.email}-{i.decode()}",
+                    "cuenta": self.nombre,
                     "de": email.utils.parseaddr(_dec(msg.get("From")))[0] or _dec(msg.get("From")),
                     "asunto": _dec(msg.get("Subject")) or "(sin asunto)",
                     "fecha": _dec(msg.get("Date"))[:22],
@@ -107,6 +109,17 @@ class Correo:
                 log.warning("Correo %s falló: %s", c.email, e)
                 salida.append(f"{c.nombre.upper()}: no pude conectar")
         return "\n\n".join(salida)
+
+    def nuevos(self, maximo=15):
+        """No leídos de hoy en todas las cuentas (para el vigilante)."""
+        hoy = __import__("datetime").date.today().strftime("%d-%b-%Y")
+        salida = []
+        for c in self._elegir():
+            try:
+                salida += c.buscar(f'(UNSEEN SINCE "{hoy}")', maximo)
+            except Exception as e:
+                log.warning("Vigilante correo %s: %s", c.email, e)
+        return salida
 
     def enviar(self, para, asunto, cuerpo, cuenta=None):
         cuentas = self._elegir(cuenta)

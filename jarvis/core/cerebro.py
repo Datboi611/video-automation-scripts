@@ -41,6 +41,7 @@ REGLAS:
 - Si te pide algo, HAZLO con herramientas en vez de explicar cómo.
 - "¿Qué tengo hoy?", "deberes", "pendientes", "tareas" -> resumen_del_dia, y comenta lo atrasado.
 - "Marca X como hecha" -> marcar_hecho.
+- "Conecta Canvas" -> pedir_dato canvas_token. "Conecta mi correo" -> pedir_dato correo_email.
 - "Conecta mi iPhone/Telegram" -> pedir_dato telegram_bot_token. "Que me llames" -> pedir_dato telegram_usuario.
 - Si necesitas un dato que el usuario debe escribir (token, enlace, clave, contraseña de aplicación) usa pedir_dato con el campo correcto; se guarda solo.
 - Si no entendiste una orden compleja, usa pedir_texto para que te la escriba.
@@ -123,6 +124,17 @@ class Cerebro:
                     else "There was an error: no Groq key configured.")
         return (f"Hubo un error, {self.cfg['tratamiento']}. Inténtelo de nuevo en un momento." if idioma == "es"
                 else f"There was an error, {self.cfg.get('tratamiento_en', 'boss')}. Please try again in a moment.")
+
+    def completar(self, prompt, max_tokens=400):
+        """Consulta simple sin herramientas (para el vigilante)."""
+        for nombre, cliente, modelo in self.proveedores:
+            try:
+                r = cliente.chat.completions.create(model=modelo, temperature=0.2, max_tokens=max_tokens,
+                                                    messages=[{"role": "user", "content": prompt}])
+                return (r.choices[0].message.content or "").strip()
+            except Exception as e:
+                log.warning("completar con %s falló: %s", modelo, e)
+        return ""
 
     def _bucle(self, cliente, modelo, mensajes, on_herramienta):
         for _ in range(12):

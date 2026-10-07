@@ -24,6 +24,7 @@ class Vigilante:
         self.j = jarvis
         self.ruta = ruta
         self.hechos = {}
+        self._ultimo = {}
         if os.path.exists(ruta):
             try:
                 with open(ruta, encoding="utf-8") as f:
@@ -35,7 +36,7 @@ class Vigilante:
         if clave in self.hechos:
             return True
         self.hechos[clave] = dt.datetime.now().isoformat(timespec="minutes")
-        corte = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+        corte = (dt.date.today() - dt.timedelta(days=30)).isoformat()
         self.hechos = {k: v for k, v in self.hechos.items() if v >= corte}
         with open(self.ruta, "w", encoding="utf-8") as f:
             json.dump(self.hechos, f)
@@ -125,7 +126,19 @@ class Vigilante:
                         partes.append(f"Atrasado ({len(venc)}): " + "; ".join(t["x"] for t in venc[:3]))
                     self._avisar(f"{trat.capitalize()}, recordatorio amistoso. " + " | ".join(partes))
 
-        # 4. Llamada si a la hora de llamada sigue algo importante pendiente
+        # 4. Correo: solo lo importante
+        cada = int(c.get("correo_cada_min", 15)) * 60
+        if time.time() - self._ultimo.get("correo", 0) >= cada:
+            self._ultimo["correo"] = time.time()
+            self._revisar_correo(trat)
+
+        # 5. Canvas: tareas nuevas, anuncios, notas, entregas faltantes
+        cada = int(c.get("canvas_cada_min", 30)) * 60
+        if time.time() - self._ultimo.get("canvas", 0) >= cada:
+            self._ultimo["canvas"] = time.time()
+            self._revisar_canvas(trat)
+
+        # 6. Llamada si a la hora de llamada sigue algo importante pendiente
         if (c.get("llamar_si_pendiente", True) and ahora.time() >= _hm(c.get("hora_llamada", "20:30"))
                 and not self._silencio(ahora) and not self._ya(f"llamada-{hoy}")):
             venc, de_hoy = self._pendientes_hoy()
@@ -139,3 +152,57 @@ class Vigilante:
                 except Exception as e:
                     log.warning("No pude llamar: %s", e)
                 self._avisar("📞 " + msg, urgente=True)
+
+    def _revisar_correo(self, trat):
+        correo = self.j.herramientas.agenda.get("correo")
+        if not correo or not correo._elegir():
+            return
+        nuevos = [m for m in correo.nuevos() if m["id"] not in self.hechos]
+        if not nuevos:
+            return
+        for m in nuevos:
+            self._ya(m["id"])
+        lista = "\n".join(f"{i}. [{m['cuenta']}] De: {m['de']} | Asunto: {m['asunto']} | {m['texto'][:200]}"
+                          for i, m in enumerate(nuevos, 1))
+        criterio = self.cfg.get("correo_importante", "")
+        respuesta = self.j.cerebro.completar(
+            "Eres el filtro de correo de un estudiante universitario y emprendedor. De estos correos nuevos, "
+            "elige SOLO los importantes (profesores, universidad, trámites, bancos, pedidos/clientes, trabajo, "
+            "entrevistas, fechas límite, personas reales que esperan respuesta). Ignora publicidad, newsletters "
+            f"y notificaciones automáticas. {criterio}\nResponde una línea por correo importante con el formato "
+            "'N: resumen de una frase en español'. Si ninguno es importante responde exactamente NINGUNO.\n\n" + lista)
+        if not respuesta or "NINGUNO" in respuesta.upper():
+            return
+        import re
+        respuesta = "\n".join("• " + re.sub(r"^\s*\d+[:.)-]\s*", "", l) for l in respuesta.splitlines() if l.strip())
+        self._avisar(f"📧 {trat.capitalize()}, correo importante:\n{respuesta}", urgente=True)
+        self.j.ui("panel", "Correo importante", [{"t": "Nuevos", "tono": "warn", "items": [
+            {"x": l.lstrip("• "), "sub": "", "tags": []} for l in respuesta.splitlines() if l.strip()]}])
+        self.j.decir(f"{trat.capitalize()}, le llegó correo importante. Se lo dejé en el panel.")
+
+    def _revisar_canvas(self, trat):
+        cv = self.j.herramientas.agenda.get("canvas")
+        if not cv or not cv.token:
+            return
+        nuevos = []
+        try:
+            items = cv.pendientes() + cv.anuncios(dias=3) + cv.novedades()
+        except Exception as e:
+            log.warning("Vigilante Canvas: %s", e)
+            return
+        primera = not any(k.startswith("cv-") for k in self.hechos)
+        for i in items:
+            if not self._ya("cv-" + i["id"]) and not primera:
+                nuevos.append(i)
+        if not nuevos:
+            return  # la primera vez solo memoriza lo que ya existe, sin avisar de todo
+        lineas = []
+        for i in nuevos[:10]:
+            etiqueta = {"anuncio": "📢", "falta": "⚠️ Sin entregar:", "tarea": "📝"}.get(i["tipo"], "🎓")
+            f = f" (vence {i['fecha']:%d/%m %H:%M})" if i.get("fecha") and i["tipo"] in ("tarea", "falta") else ""
+            lineas.append(f"{etiqueta} [{i['curso']}] {i['titulo']}{f}")
+        self._avisar(f"🎓 {trat.capitalize()}, novedades en Canvas:\n" + "\n".join(lineas))
+        self.j.ui("panel", "Canvas", [{"t": "Novedades", "tono": "info", "items": [
+            {"x": i["titulo"], "sub": i["curso"], "tags": [[i["tipo"], "warn" if i["tipo"] == "falta" else "info"]]}
+            for i in nuevos[:10]]}])
+        self.j.decir(f"{trat.capitalize()}, hay novedades en Canvas.")
