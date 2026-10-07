@@ -81,10 +81,12 @@ class Escucha:
         except Exception:
             log.warning("No se encontró el modelo Vosk en %s", ruta)
             return None
-        palabras = [p for p in self.palabra.split() if modelo.find_word(p) != -1]
-        if palabras:
-            return KaldiRecognizer(modelo, SR, json.dumps([" ".join(palabras), "[unk]"]))
-        return KaldiRecognizer(modelo, SR)
+        try:
+            frases = [self.palabra, "hey " + self.palabra, "oye " + self.palabra, "[unk]"]
+            return KaldiRecognizer(modelo, SR, json.dumps(frases))
+        except Exception:
+            log.exception("No pude crear el detector de palabra")
+            return None
 
     # --- API pública ---
     def iniciar(self):
