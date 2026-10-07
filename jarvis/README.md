@@ -76,6 +76,12 @@ Si Twilio falla, usa CallMeBot (Telegram) como respaldo.
 Si tu iPhone está en el mismo WiFi que el PC, JARVIS habla; si sales (10 min sin verlo) se calla, deja de escuchar y te avisa todo por Telegram. Al volver te saluda y resume lo que pasó.
 Configúralo diciendo «detecta cuando salgo de casa» y escribe la **Dirección Wi-Fi** de tu iPhone (Ajustes → Wi-Fi → ⓘ junto a tu red). En esa misma pantalla pon **Dirección Wi-Fi privada: Fija** (no «Rotativa»).
 
+## Siempre responde
+
+Si la IA no contesta, JARVIS dice «un momento», reintenta en segundo plano y usa respaldos en este orden: Groq → Gemini (clave gratis) → Claude Code → IA local. Nunca se rinde: te da la respuesta en cuanto la tenga.
+- **IA local (sin internet, gratis):** doble clic en `instalar_cerebro_local.bat` (descarga ~2 GB).
+- **Gemini (gratis):** dile «conecta Gemini» y pega la clave de aistudio.google.com/apikey.
+
 ## JARVIS + tu Claude (Claude Code)
 
 JARVIS le encarga a Claude las tareas grandes (programar, crear documentos, automatizar, investigar a fondo) usando tu plan de Claude. Claude las hace en el PC en segundo plano y JARVIS te avisa (también por Telegram) al terminar.

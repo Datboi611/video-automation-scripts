@@ -21,7 +21,7 @@ DEFAULTS = {
         "proveedores": [
             {"nombre": "groq", "api_key": "", "modelo": "meta-llama/llama-4-scout-17b-16e-instruct"},
             {"nombre": "gemini", "api_key": "", "modelo": "gemini-2.5-flash"},
-            {"nombre": "ollama", "modelo": "qwen2.5:7b", "url": "http://localhost:11434/v1"},
+            {"nombre": "ollama", "modelo": "qwen2.5:3b", "url": "http://localhost:11434/v1"},
         ]
     },
     "stt": {"motor": "auto", "modelo_local": "small"},

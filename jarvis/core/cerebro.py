@@ -75,6 +75,8 @@ class Cerebro:
         for p in cfg["llm"]["proveedores"]:
             if p["nombre"] != "ollama" and not p.get("api_key"):
                 continue
+            if p["nombre"] == "ollama" and not _ollama_activo(p.get("url")):
+                continue  # sin Ollama instalado no pierdo tiempo intentándolo
             url = p.get("url") or config.URLS_PROVEEDOR.get(p["nombre"])
             timeout = 120 if p["nombre"] == "ollama" else 40 if p["nombre"] == "claude" else 25
             cliente = OpenAI(api_key=p.get("api_key") or "ollama", base_url=url, timeout=timeout, max_retries=0)
@@ -222,3 +224,12 @@ def claude_respaldo(texto, sistema, timeout=120):
     except Exception as e:
         log.warning("Claude de respaldo no respondió: %s", e)
         return None
+
+
+def _ollama_activo(url):
+    import requests
+    try:
+        base = (url or "http://localhost:11434/v1").replace("/v1", "")
+        return requests.get(base + "/api/tags", timeout=1.5).ok
+    except Exception:
+        return False

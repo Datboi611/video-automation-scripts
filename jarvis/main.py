@@ -515,12 +515,23 @@ class Jarvis:
         if not respuesta:
             self.ui("proceso", pid, etiqueta, "consultando a Claude")
             respuesta = claude_respaldo(texto, self.cerebro._sistema())
-        if not respuesta:
-            respuesta = (f"{self.cfg['tratamiento'].capitalize()}, lo de «{texto[:60]}» tendrá que esperar unos minutos: "
-                         "mis servidores siguen saturados. Pídamelo de nuevo en un rato y lo resuelvo.")
-            self.ui("proceso", pid, etiqueta, "pendiente")
-        else:
-            self.ui("proceso", pid, etiqueta, "hecho")
+        intento = 0
+        while not respuesta:  # no me rindo: sigo hasta tener la respuesta
+            intento += 1
+            self.ui("proceso", pid, etiqueta, f"reintentando ({intento})")
+            if intento == 1 and hablar:
+                self.decir(f"Sigo trabajando en lo que me pidió, {self.cfg['tratamiento']}. Le aviso apenas lo tenga.")
+            time.sleep(min(120, 30 * intento))
+            try:
+                self.cerebro = Cerebro(self.cfg, self.herramientas, self.memoria, self.habilidades)  # refresca modelos
+                r = self.cerebro.responder(texto, idioma=idioma)
+                if r and not self.cerebro.hubo_error:
+                    respuesta = r
+                    break
+            except Exception:
+                log.exception("Reintento largo")
+            respuesta = claude_respaldo(texto, self.cerebro._sistema()) if intento % 3 == 0 else None
+        self.ui("proceso", pid, etiqueta, "hecho")
         if origen == "telefono" and self.bot:
             self.bot.enviar(respuesta)
         elif hablar:
