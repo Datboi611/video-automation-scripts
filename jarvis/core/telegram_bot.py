@@ -114,18 +114,21 @@ class BotTelegram:
         chat = str(m["chat"]["id"])
         texto = (m.get("text") or "").strip()
         if not self.cfg.get("chat_id"):
-            if self.codigo and texto == self.codigo:
-                self.cfg["chat_id"] = chat
-                self.guardar("chat_id", chat)
-                self.codigo = None
-                self._api("sendMessage", data={"chat_id": chat, "text":
-                          "Vinculado, jefe. Desde ahora le obedezco aquí también.\n"
-                          "Escríbame o mándeme notas de voz. Comandos: /pantalla /hoy /estado"})
-                self.j.decir("Su teléfono quedó vinculado, jefe.")
-            else:
-                self._api("sendMessage", data={"chat_id": chat, "text":
-                          "Envíame el código de 6 dígitos que JARVIS muestra en tu PC."})
-            return
+            # Vinculación automática: el primer chat privado que le escribe al bot es su dueño.
+            # (El bot es nuevo y solo usted conoce su nombre; queda registrado y anunciado en el PC.)
+            if m["chat"].get("type") != "private":
+                return
+            self.cfg["chat_id"] = chat
+            self.guardar("chat_id", chat)
+            self.codigo = None
+            quien = m["chat"].get("first_name") or m["chat"].get("username") or "jefe"
+            log.info("Telegram vinculado automáticamente con %s (%s)", quien, chat)
+            self._api("sendMessage", data={"chat_id": chat, "text":
+                      f"✅ Vinculado, {quien}. Desde ahora le obedezco aquí también.\n"
+                      "Escríbame o mándeme notas de voz. Comandos: /hoy /pantalla /estado /canvas /correo"})
+            self.j.decir(f"Su teléfono quedó vinculado, jefe. Le acabo de escribir por Telegram.")
+            if texto.startswith("/"):
+                return
         if chat != str(self.cfg["chat_id"]):
             return  # cualquier otro chat se ignora
         try:

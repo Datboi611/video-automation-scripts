@@ -124,3 +124,5 @@ body { grid-template-rows: auto 1fr; }
 .chip.ok { background: rgba(75,227,154,.14); color: #4be39a; }
 @media (max-width: 1100px) { .lateral { width: 290px; } }
 .chat { width: min(560px, calc(100% - 32px)); bottom: 84px; }
+
+#log, #log[hidden] { display: none !important; }

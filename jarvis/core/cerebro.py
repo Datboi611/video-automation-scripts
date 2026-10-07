@@ -44,7 +44,7 @@ REGLAS:
 - "Marca X como hecha" -> marcar_hecho.
 - "Detecta cuando salgo de casa" / "conecta mi teléfono al WiFi" -> pedir_dato telefono_mac.
 - "Conecta Canvas" / "inicia sesión en Canvas" -> canvas_iniciar_sesion. "Conecta mi correo" -> pedir_dato correo_email.
-- "Conecta mi iPhone/Telegram" -> pedir_dato telegram_bot_token. Si el usuario quiere dar su Id/chat id de Telegram -> pedir_dato telegram_chat_id. "Que me llames" / "configura las llamadas" -> pedir_dato twilio_sid (llamada real con número); si prefiere Telegram, pedir_dato telegram_usuario.
+- Telegram: NUNCA pidas chat id ni código; se vincula solo cuando el usuario pulsa Iniciar en su bot. Si falta el token -> pedir_dato telegram_bot_token. "Que me llames" / "configura las llamadas" -> pedir_dato twilio_sid (llamada real con número); si prefiere Telegram, pedir_dato telegram_usuario.
 - Si necesitas un dato que el usuario debe escribir (token, enlace, clave, contraseña de aplicación) usa pedir_dato con el campo correcto; se guarda solo.
 - Si no entendiste una orden compleja, usa pedir_texto para que te la escriba.
 - Tareas grandes (programar, crear documentos/archivos, automatizar, investigación profunda, "hazlo tú", "que lo haga Claude") -> delegar_a_claude con una descripción detallada; confirma que lo encargaste y que avisarás al terminar.

@@ -148,6 +148,15 @@ def accion_rapida(texto, herr, cfg):
         asunto = resto.split("—")[0].strip()
         return (f"Tiene {len(correos)} correo{'s' if len(correos) > 1 else ''} sin leer, {j}. "
                 f"El más reciente es de {de.strip()}: {asunto}. Le dejé el resto en el panel." + acotacion("correo", cfg, herr))
+    if re.search(r"\b(conecta|vincula|configura|enlaza)\b.*\b(iphone|tel[eé]fono|celular|telegram|bot|m[oó]vil)\b", t) \
+            and not re.search(r"llam", t):
+        bot = getattr(herr, "bot", None)
+        if not bot or not bot.activo:
+            herr.ejecutar("pedir_dato", {"campo": "telegram_bot_token"})
+            return f"Pegue en la barra el token que le dio BotFather, {j}. Lo demás lo hago yo."
+        if not bot.cfg.get("chat_id"):
+            return f"Ya casi, {j}. Abra su bot en Telegram y pulse Iniciar; lo vinculo yo solo."
+        return f"Su iPhone ya está vinculado, {j}." + acotacion("mensaje", cfg, herr)
     if re.fullmatch(r"(haz|hazte|corre|ejecuta)( un)? (diagn[oó]stico|chequeo|revisi[oó]n)( del sistema| de todo)?|diagn[oó]stico", t):
         return herr.ejecutar("diagnostico", {})
     m = re.match(r"^(?:marca|marcar|completa|tacha)\s+(.+?)\s+como\s+(?:hech[ao]|completad[ao]|terminad[ao]|lista|listo)$", t) \
@@ -156,6 +165,23 @@ def accion_rapida(texto, herr, cfg):
         r = herr.ejecutar("marcar_hecho", {"texto": m.group(1)})
         return r + (acotacion("hecho", cfg, herr, 0.6) if not r.startswith("No encontr") else "")
     return None
+
+
+PATRONES_CLAVE = [
+    (r"\b\d{8,11}:[A-Za-z0-9_-]{30,}\b", "telegram_bot_token"),
+    (r"\bgsk_[A-Za-z0-9]{20,}\b", "groq_api_key"),
+    (r"\bsk_[a-f0-9]{40,}\b", "elevenlabs_api_key"),
+    (r"\bAIza[0-9A-Za-z_-]{30,}\b", "gemini_api_key"),
+    (r"\bAC[a-f0-9]{32}\b", "twilio_sid"),
+]
+
+
+def detectar_clave(texto):
+    for patron, campo in PATRONES_CLAVE:
+        m = re.search(patron, texto)
+        if m:
+            return campo, m.group(0)
+    return None, None
 
 
 class Jarvis:
@@ -326,9 +352,9 @@ class Jarvis:
         if not self.bot.activo:
             return
         self.bot.iniciar()
-        if self.bot.codigo:
-            self.ui("panel", "Vincular iPhone", [{"t": "Código", "tono": "warn", "items": [
-                {"x": " ".join(self.bot.codigo), "sub": "Envíalo a tu bot en Telegram desde el iPhone", "tags": []}]}])
+        if not self.bot.cfg.get("chat_id"):
+            self.ui("panel", "Vincular iPhone", [{"t": "Un paso", "tono": "warn", "items": [
+                {"x": "Abre tu bot en Telegram y pulsa Iniciar", "sub": "Se vincula solo", "tags": []}]}])
 
     def guardar_campo(self, campo, valor):
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
@@ -356,9 +382,10 @@ class Jarvis:
                 self.bot._api("getMe")
             except Exception:
                 return self.decir("Telegram rechazó ese token, jefe. Revise que esté completo.")
+            self.herramientas.bot = self.bot
             self.iniciar_bot()
-            msg = (f"Bot conectado, {c['tratamiento']}. Envíele desde su iPhone el código que le muestro en el panel: "
-                   f"{' '.join(self.bot.codigo or '')}.")
+            msg = (f"Bot conectado, {c['tratamiento']}. Ahora abra su bot en Telegram desde el iPhone y pulse Iniciar; "
+                   "lo vinculo yo solo.")
         elif campo == "canvas_token":
             c["agenda"]["canvas_token"] = valor
             config.guardar_valor(["agenda", "canvas_token"], valor)
@@ -472,6 +499,10 @@ class Jarvis:
         """Cada pedido es un proceso independiente: pueden correr varios a la vez."""
         if self.escucha:
             self.escucha.actividad()
+        campo, valor = detectar_clave(texto)
+        if campo:  # pegó un token o clave: lo guardo directo, sin preguntar
+            self.guardar_campo(campo, valor)
+            return "Configurado."
         self._n += 1
         pid = self._n
         self.activos += 1
@@ -621,6 +652,9 @@ class Api:
     def enviar(self, texto, campo=None):
         if not texto.strip():
             return
+        detectado, valor = detectar_clave(texto)
+        if detectado and (not campo or campo != detectado):
+            campo, texto = detectado, valor  # reconoce la clave aunque la barra pidiera otra cosa
         if campo:
             threading.Thread(target=self._j.guardar_campo, args=(campo, texto), daemon=True).start()
         else:
