@@ -354,6 +354,24 @@ class Jarvis:
             msg = (f"Listo, {c['tratamiento']}. Veo su iPhone en la red: cuando salga de casa me callaré." if visto else
                    f"Guardado, {c['tratamiento']}, pero no veo su iPhone en este WiFi ahora. "
                    "Revise que la dirección Wi-Fi privada esté en modo fija.")
+        elif campo in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero"):
+            if campo in ("twilio_numero", "mi_numero"):
+                valor = "+" + re.sub(r"\D", "", valor)
+            c["telefono"][campo] = valor
+            config.guardar_valor(["telefono", campo], valor)
+            siguiente = {"twilio_sid": "twilio_token", "twilio_token": "twilio_numero", "twilio_numero": "mi_numero"}.get(campo)
+            if siguiente:
+                self.herramientas.pedir_dato(siguiente)
+                msg = "Anotado. Siguiente dato en la barra."
+            else:
+                try:
+                    self.telefono.llamar_twilio(f"Hola {c['tratamiento']}, le habla JARVIS. Prueba de llamada exitosa. "
+                                                "Desde ahora le llamaré cuando algo no pueda esperar.")
+                    msg = f"Le estoy llamando como prueba, {c['tratamiento']}. Conteste."
+                except Exception as e:
+                    log.warning("Prueba Twilio: %s", e)
+                    msg = ("Guardé los datos, pero Twilio rechazó la llamada. Si su cuenta es de prueba, "
+                           "verifique su número en Twilio, en Verified Caller IDs.")
         elif campo == "telegram_usuario":
             u = valor if valor.startswith("@") else "@" + valor
             c["telefono"]["telegram_usuario"] = u

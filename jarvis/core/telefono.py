@@ -15,6 +15,7 @@ log = logging.getLogger("jarvis")
 class Telefono:
     def __init__(self, cfg):
         t = cfg["telefono"]
+        self.cfg_tel = t
         self.servidor = t["ntfy_servidor"].rstrip("/")
         self.tema = t["ntfy_tema"].strip()
         self.telegram = t["telegram_usuario"].strip()
@@ -33,7 +34,33 @@ class Telefono:
         r.raise_for_status()
         return "Notificación enviada al teléfono."
 
+    @property
+    def twilio_listo(self):
+        t = self.cfg_tel
+        return all(t.get(k) for k in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero"))
+
+    def llamar_twilio(self, mensaje):
+        """Llamada telefónica REAL a tu número (contestas y escuchas a JARVIS)."""
+        from xml.sax.saxutils import escape
+        t = self.cfg_tel
+        voz = t.get("twilio_voz", "Polly.Andres-Neural")
+        decir = f'<Say voice="{voz}" language="es-MX">{escape(mensaje[:900])}</Say>'
+        twiml = (f'<Response><Pause length="1"/>{decir}<Pause length="1"/>'
+                 f'<Say voice="{voz}" language="es-MX">Repito.</Say>{decir}</Response>')
+        r = requests.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/Calls.json",
+            auth=(t["twilio_sid"], t["twilio_token"]), timeout=20,
+            data={"To": t["mi_numero"], "From": t["twilio_numero"], "Twiml": twiml})
+        if r.status_code >= 400:
+            raise RuntimeError(r.json().get("message", r.text[:200]))
+        return "Llamando a su teléfono."
+
     def llamar(self, mensaje):
+        if self.twilio_listo:
+            try:
+                return self.llamar_twilio(mensaje)
+            except Exception as e:
+                log.warning("Twilio falló, uso CallMeBot: %s", e)
         if not self.telegram:
             return "No hay usuario de Telegram configurado (telefono.telegram_usuario)."
         r = requests.get(

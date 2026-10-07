@@ -77,7 +77,7 @@ SPECS = [
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
     ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
-     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_usuario | canvas_token | correo_email | correo_app_password | telefono_mac"),
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_usuario | canvas_token | correo_email | correo_app_password | telefono_mac | twilio_sid | twilio_token | twilio_numero | mi_numero"),
       "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
     ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
@@ -132,7 +132,7 @@ SPECS = [
     ("recordar_dato", "Guarda un dato duradero del usuario.", {"dato": (S, "Dato")}),
     ("olvidar_dato", "Borra un dato de memoria.", {"texto": (S, "Texto")}),
     ("notificar_telefono", "Notificación push al teléfono.", {"mensaje": (S, "Mensaje")}),
-    ("llamar_telefono", "Llama al teléfono (Telegram) con un mensaje.", {"mensaje": (S, "Mensaje")}),
+    ("llamar_telefono", "Llama al celular del usuario y le dice un mensaje (número real con Twilio, o Telegram).", {"mensaje": (S, "Mensaje")}),
     ("mensaje_telegram", "Mensaje de Telegram al usuario.", {"mensaje": (S, "Mensaje")}),
     ("crear_habilidad", "Programa e instala una habilidad nueva en Python cuando no tengas herramienta para algo. El código define ejecutar(**kwargs) -> str.",
      {"nombre": (S, "nombre_corto"), "descripcion": (S, "Qué hace y qué argumentos recibe"), "codigo": (S, "Código Python completo")}),
@@ -658,6 +658,10 @@ class Herramientas:
                   "canvas_token": "Pega tu token de Canvas (Cuenta → Configuración → Nuevo token de acceso)",
                   "correo_email": "Escribe tu correo personal (Gmail o iCloud)",
                   "telefono_mac": "Escribe la Dirección Wi-Fi de tu iPhone (Ajustes → Wi-Fi → ⓘ)",
+                  "twilio_sid": "Pega tu Account SID de Twilio (empieza con AC)",
+                  "twilio_token": "Pega tu Auth Token de Twilio",
+                  "twilio_numero": "Escribe el número que te dio Twilio (ej. +18015551234)",
+                  "mi_numero": "Escribe TU número de celular con código de país (ej. +18015550000)",
                   "correo_app_password": "Pega la contraseña de aplicación de tu correo"}
         if campo not in textos:
             return f"Campo no válido. Opciones: {', '.join(textos)}."

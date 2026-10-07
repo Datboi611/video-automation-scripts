@@ -35,6 +35,9 @@ DEFAULTS = {
         "ntfy_tema": "",
         "telegram_usuario": "",
         "control_remoto": False,
+        # Llamadas reales con número (Twilio): twilio.com/try-twilio
+        "twilio_sid": "", "twilio_token": "", "twilio_numero": "", "mi_numero": "",
+        "twilio_voz": "Polly.Andres-Neural",
     },
     "telegram_bot": {"token": "", "chat_id": ""},
     "vigilante": {"resumen_matutino": "08:00", "revisiones": ["14:00", "19:00"], "aviso_eventos_min": 30,

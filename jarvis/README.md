@@ -63,6 +63,14 @@ Ejemplos:
 - **Canvas** (cada 30 min): tareas nuevas, anuncios, notas publicadas y entregas faltantes. Dile «conecta Canvas»: se abre una ventana de Edge, inicias sesión con tu uNID y apruebas Duo **una vez**; JARVIS guarda la sesión y la renueva solo. Si la universidad la cierra, te avisa por Telegram. (Si tu universidad permite tokens, también puedes pegar uno en `canvas_token`.) También puedes pedirle «¿qué tengo en Canvas?», «abre Canvas de física», «¿hay anuncios nuevos?».
 - Ajustes en `config.json` → `vigilante` (`correo_cada_min`, `canvas_cada_min`, `correo_importante` para decirle qué consideras importante).
 
+## Llamadas reales con número (Twilio)
+
+JARVIS te llama a tu celular como una llamada normal, con su voz. Twilio regala ~$15 de crédito al registrarte (luego ~$1.15/mes por el número + ~$0.014/min).
+1. Crea cuenta en twilio.com/try-twilio y verifica tu celular.
+2. En la consola: **Get a phone number** (número de EE. UU. con voz).
+3. Dile a JARVIS «configura las llamadas» y pega en la barra: Account SID, Auth Token, el número de Twilio y tu número. Te llamará de prueba.
+Si Twilio falla, usa CallMeBot (Telegram) como respaldo.
+
 ## Sabe si estás en casa
 
 Si tu iPhone está en el mismo WiFi que el PC, JARVIS habla; si sales (10 min sin verlo) se calla, deja de escuchar y te avisa todo por Telegram. Al volver te saluda y resume lo que pasó.
