@@ -177,6 +177,24 @@ PATRONES_CLAVE = [
 ]
 
 
+def datos_twilio(texto):
+    """Si pegó los datos de Twilio juntos: SID, token y números (el primero es el de Twilio, el segundo el suyo)."""
+    sid = re.search(r"\bAC[a-f0-9]{32}\b", texto)
+    if not sid:
+        return None
+    resto = texto.replace(sid.group(0), " ")
+    token = re.search(r"\b[a-f0-9]{32}\b", resto)
+    numeros = re.findall(r"\+?\d[\d\s().-]{8,}\d", resto.replace(token.group(0), " ") if token else resto)
+    datos = {"twilio_sid": sid.group(0)}
+    if token:
+        datos["twilio_token"] = token.group(0)
+    if len(numeros) >= 1:
+        datos["twilio_numero"] = numeros[0]
+    if len(numeros) >= 2:
+        datos["mi_numero"] = numeros[1]
+    return datos
+
+
 def detectar_clave(texto):
     for patron, campo in PATRONES_CLAVE:
         m = re.search(patron, texto)
@@ -357,6 +375,27 @@ class Jarvis:
             self.ui("panel", "Vincular iPhone", [{"t": "Un paso", "tono": "warn", "items": [
                 {"x": "Abre tu bot en Telegram y pulsa Iniciar", "sub": "Se vincula solo", "tags": []}]}])
 
+    def guardar_twilio(self, datos):
+        from core.telefono import normalizar_numero
+        c = self.cfg
+        for k, v in datos.items():
+            if k in ("twilio_numero", "mi_numero"):
+                v = normalizar_numero(v)
+            c["telefono"][k] = v
+            config.guardar_valor(["telefono", k], v)
+        faltan = [k for k in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero") if not c["telefono"].get(k)]
+        if faltan:
+            self.herramientas.pedir_dato(faltan[0])
+            return self.decir("Guardé lo de Twilio. Me falta un dato; lo pido en la barra.")
+        try:
+            self.telefono.llamar_twilio(f"Hola {c['tratamiento']}, le habla JARVIS. Llamadas configuradas correctamente.")
+            self.decir(f"Llamadas configuradas, {c['tratamiento']}. Le estoy llamando ahora; conteste.")
+        except Exception as e:
+            log.warning("Prueba Twilio: %s", e)
+            self.decir(f"Guardé los datos, {c['tratamiento']}, pero Twilio no aceptó la llamada. "
+                       "Le dejo el motivo en el panel.")
+            self.ui("panel", "Twilio", [{"t": "Motivo", "tono": "crit", "items": [{"x": str(e)[:300], "sub": "", "tags": []}]}])
+
     def guardar_campo(self, campo, valor):
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
         valor = valor.strip()
@@ -501,6 +540,10 @@ class Jarvis:
         """Cada pedido es un proceso independiente: pueden correr varios a la vez."""
         if self.escucha:
             self.escucha.actividad()
+        tw = datos_twilio(texto)
+        if tw and len(tw) > 1:
+            self.guardar_twilio(tw)
+            return "Configurado."
         campo, valor = detectar_clave(texto)
         if campo:  # pegó un token o clave: lo guardo directo, sin preguntar
             self.guardar_campo(campo, valor)
@@ -653,6 +696,10 @@ class Api:
 
     def enviar(self, texto, campo=None):
         if not texto.strip():
+            return
+        tw = datos_twilio(texto)
+        if tw and len(tw) > 1:
+            threading.Thread(target=self._j.guardar_twilio, args=(tw,), daemon=True).start()
             return
         detectado, valor = detectar_clave(texto)
         if detectado and (not campo or campo != detectado):
