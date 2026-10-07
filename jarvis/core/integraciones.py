@@ -103,6 +103,14 @@ class Todoist:
         datos = r.json()
         return datos.get("results", datos) if isinstance(datos, dict) else datos
 
+    def todas(self):
+        if not self.token:
+            return None
+        r = requests.get(f"{self.API}/tasks", headers=self._h(), params={"limit": 200}, timeout=15)
+        r.raise_for_status()
+        datos = r.json()
+        return datos.get("results", datos) if isinstance(datos, dict) else datos
+
     def texto(self, filtro="today | overdue"):
         ts = self.tareas(filtro)
         if ts is None:

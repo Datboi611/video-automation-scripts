@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import logging
 import os
+import re
 import threading
 import time
 
@@ -59,11 +60,17 @@ class Vigilante:
         t = ahora.time()
         return t >= ini or t < fin if ini > fin else ini <= t < fin
 
-    def _avisar(self, texto, urgente=False):
-        """Telegram si está vinculado; si no, notificación ntfy. En el PC lo dice en voz alta."""
+    def _avisar(self, texto, urgente=False, voz=None):
+        """Telegram si está vinculado (si no, ntfy) y además lo DICE en voz alta en el PC, sin esperar a que le hablen."""
         if not self.j.bot or not self.j.bot.enviar(texto):
             try:
                 self.j.telefono.notificar(texto, "JARVIS", 5 if urgente else 3)
+            except Exception:
+                pass
+        if voz is not False and not self._silencio(dt.datetime.now()):
+            hablado = voz or re.sub(r"[^\w\s,.:;¿?¡!áéíóúñÁÉÍÓÚÑ()/-]", "", texto.split("\n")[0]).strip()
+            try:
+                threading.Thread(target=self.j.decir, args=(hablado,), daemon=True).start()
             except Exception:
                 pass
 
@@ -96,7 +103,10 @@ class Vigilante:
             lineas += [f"⚠️ ATRASADO: {t['x']}" for t in venc[:8]]
             if len(lineas) == 1:
                 lineas.append("Nada urgente. Un día sorprendentemente civilizado.")
-            self._avisar("\n".join(lineas))
+            voz = (f"Buenos días, {trat}. Hoy tiene {len(de_hoy)} pendientes"
+                   + (f" y {len(venc)} atrasados; sugiero empezar por {(venc or de_hoy)[0]['x']}." if venc
+                      else (f"; lo primero es {de_hoy[0]['x']}." if de_hoy else ". Un día sorprendentemente civilizado.")))
+            self._avisar("\n".join(lineas), voz=voz)
 
         # 2. Aviso antes de eventos del calendario
         cal = self.j.herramientas.agenda.get("calendario")
@@ -109,8 +119,8 @@ class Vigilante:
                     falta = (e["inicio"] - ahora).total_seconds() / 60
                     if 0 < falta <= margen and not self._ya(f"ev-{e['titulo']}-{e['inicio']:%Y%m%d%H%M}"):
                         self._avisar(f"🔔 {trat}, en {int(falta)} min: {e['titulo']}"
-                                     + (f" ({e['lugar']})" if e["lugar"] else ""), urgente=True)
-                        self.j.decir(f"{trat.capitalize()}, en {int(falta)} minutos tiene {e['titulo']}.")
+                                     + (f" ({e['lugar']})" if e["lugar"] else ""), urgente=True,
+                                     voz=f"{trat.capitalize()}, en {int(falta)} minutos tiene {e['titulo']}.")
             except Exception as ex:
                 log.warning("Vigilante calendario: %s", ex)
 
@@ -124,7 +134,8 @@ class Vigilante:
                         partes.append("Vence hoy: " + "; ".join(t["x"] for t in de_hoy[:5]))
                     if venc:
                         partes.append(f"Atrasado ({len(venc)}): " + "; ".join(t["x"] for t in venc[:3]))
-                    self._avisar(f"{trat.capitalize()}, recordatorio amistoso. " + " | ".join(partes))
+                    self._avisar(f"{trat.capitalize()}, recordatorio amistoso. " + " | ".join(partes),
+                                 voz=f"{trat.capitalize()}, recordatorio amistoso: " + ". ".join(partes)[:300])
 
         # 4. Correo: solo lo importante
         cada = int(c.get("correo_cada_min", 15)) * 60
@@ -138,7 +149,12 @@ class Vigilante:
             self._ultimo["canvas"] = time.time()
             self._revisar_canvas(trat)
 
-        # 6. Llamada si a la hora de llamada sigue algo importante pendiente
+        # 6. Tareas nuevas en Todoist (las que agregas desde el celular u otro lado)
+        if time.time() - self._ultimo.get("todoist", 0) >= 600:
+            self._ultimo["todoist"] = time.time()
+            self._revisar_todoist(trat)
+
+        # 7. Llamada si a la hora de llamada sigue algo importante pendiente
         if (c.get("llamar_si_pendiente", True) and ahora.time() >= _hm(c.get("hora_llamada", "20:30"))
                 and not self._silencio(ahora) and not self._ya(f"llamada-{hoy}")):
             venc, de_hoy = self._pendientes_hoy()
@@ -151,7 +167,7 @@ class Vigilante:
                     log.info("Llamada: %s", r)
                 except Exception as e:
                     log.warning("No pude llamar: %s", e)
-                self._avisar("📞 " + msg, urgente=True)
+                self._avisar("📞 " + msg, urgente=True, voz=msg)
 
     def _revisar_correo(self, trat):
         correo = self.j.herramientas.agenda.get("correo")
@@ -175,10 +191,11 @@ class Vigilante:
             return
         import re
         respuesta = "\n".join("• " + re.sub(r"^\s*\d+[:.)-]\s*", "", l) for l in respuesta.splitlines() if l.strip())
-        self._avisar(f"📧 {trat.capitalize()}, correo importante:\n{respuesta}", urgente=True)
+        primeros = [l.lstrip("• ") for l in respuesta.splitlines()[:2]]
+        self._avisar(f"📧 {trat.capitalize()}, correo importante:\n{respuesta}", urgente=True,
+                     voz=f"{trat.capitalize()}, correo importante. " + " ".join(primeros))
         self.j.ui("panel", "Correo importante", [{"t": "Nuevos", "tono": "warn", "items": [
             {"x": l.lstrip("• "), "sub": "", "tags": []} for l in respuesta.splitlines() if l.strip()]}])
-        self.j.decir(f"{trat.capitalize()}, le llegó correo importante. Se lo dejé en el panel.")
 
     def _revisar_canvas(self, trat):
         from .canvas import SesionExpirada
@@ -207,8 +224,25 @@ class Vigilante:
             etiqueta = {"anuncio": "📢", "falta": "⚠️ Sin entregar:", "tarea": "📝"}.get(i["tipo"], "🎓")
             f = f" (vence {i['fecha']:%d/%m %H:%M})" if i.get("fecha") and i["tipo"] in ("tarea", "falta") else ""
             lineas.append(f"{etiqueta} [{i['curso']}] {i['titulo']}{f}")
-        self._avisar(f"🎓 {trat.capitalize()}, novedades en Canvas:\n" + "\n".join(lineas))
+        dicho = "; ".join(f"{i['titulo']} de {i['curso']}" for i in nuevos[:2])
+        self._avisar(f"🎓 {trat.capitalize()}, novedades en Canvas:\n" + "\n".join(lineas),
+                     voz=f"{trat.capitalize()}, novedades en Canvas: {dicho}" + (f", y {len(nuevos) - 2} más." if len(nuevos) > 2 else "."))
         self.j.ui("panel", "Canvas", [{"t": "Novedades", "tono": "info", "items": [
             {"x": i["titulo"], "sub": i["curso"], "tags": [[i["tipo"], "warn" if i["tipo"] == "falta" else "info"]]}
             for i in nuevos[:10]]}])
-        self.j.decir(f"{trat.capitalize()}, hay novedades en Canvas.")
+
+    def _revisar_todoist(self, trat):
+        tod = self.j.herramientas.agenda.get("todoist")
+        if not tod or not tod.token:
+            return
+        try:
+            tareas = tod.todas() or []
+        except Exception as e:
+            log.warning("Vigilante Todoist: %s", e)
+            return
+        primera = not any(k.startswith("td-") for k in self.hechos)
+        nuevas = [t for t in tareas if not self._ya(f"td-{t['id']}") and not primera]
+        if nuevas:
+            nombres = ", ".join(t["content"] for t in nuevas[:3])
+            self._avisar(f"📝 {trat.capitalize()}, tarea nueva en Todoist: {nombres}",
+                         voz=f"{trat.capitalize()}, anoté una tarea nueva en su lista: {nombres}.")
