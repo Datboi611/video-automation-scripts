@@ -181,12 +181,18 @@ class Vigilante:
         self.j.decir(f"{trat.capitalize()}, le llegó correo importante. Se lo dejé en el panel.")
 
     def _revisar_canvas(self, trat):
+        from .canvas import SesionExpirada
         cv = self.j.herramientas.agenda.get("canvas")
-        if not cv or not cv.token:
+        if not cv or not cv.conectado:
             return
         nuevos = []
         try:
             items = cv.pendientes() + cv.anuncios(dias=3) + cv.novedades()
+        except SesionExpirada:
+            if not self._ya(f"canvas-sesion-{dt.date.today()}"):
+                self._avisar(f"🎓 {trat.capitalize()}, la universidad cerró la sesión de Canvas. "
+                             "Cuando esté en el PC, dígame «inicia sesión en Canvas» y apruebe Duo.")
+            return
         except Exception as e:
             log.warning("Vigilante Canvas: %s", e)
             return

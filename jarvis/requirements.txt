@@ -18,3 +18,4 @@ recurring-ical-events
 yt-dlp
 ddgs
 beautifulsoup4
+playwright

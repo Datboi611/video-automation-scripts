@@ -60,7 +60,7 @@ Ejemplos:
 ## Correo y Canvas vigilados (segundo plano)
 
 - **Correo** (cada 15 min): solo te avisa de lo importante (profes, universidad, trámites, clientes…). Dile «conecta mi correo» y escribe tu correo + una *contraseña de aplicación* (Gmail: myaccount.google.com/apppasswords · iCloud: appleid.apple.com).
-- **Canvas** (cada 30 min): tareas nuevas, anuncios, notas publicadas y entregas faltantes. Dile «conecta Canvas» y pega un token (Canvas → Cuenta → Configuración → «+ Nuevo token de acceso»). También puedes pedirle «¿qué tengo en Canvas?», «abre Canvas de física», «¿hay anuncios nuevos?».
+- **Canvas** (cada 30 min): tareas nuevas, anuncios, notas publicadas y entregas faltantes. Dile «conecta Canvas»: se abre una ventana de Edge, inicias sesión con tu uNID y apruebas Duo **una vez**; JARVIS guarda la sesión y la renueva solo. Si la universidad la cierra, te avisa por Telegram. (Si tu universidad permite tokens, también puedes pegar uno en `canvas_token`.) También puedes pedirle «¿qué tengo en Canvas?», «abre Canvas de física», «¿hay anuncios nuevos?».
 - Ajustes en `config.json` → `vigilante` (`correo_cada_min`, `canvas_cada_min`, `correo_importante` para decirle qué consideras importante).
 
 ## JARVIS + tu Claude (Claude Code)

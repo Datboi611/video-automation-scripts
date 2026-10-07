@@ -1,7 +1,12 @@
-"""Canvas LMS (University of Utah: utah.instructure.com) con un token personal.
-Canvas → Cuenta → Configuración → «+ Nuevo token de acceso»."""
+"""Canvas LMS (University of Utah: utah.instructure.com).
+Dos formas de entrar:
+- Token personal (si la universidad lo permite).
+- Sesión del navegador: el usuario inicia sesión una vez (uNID + Duo) en una ventana de Edge que abre JARVIS;
+  JARVIS guarda esa sesión y la renueva solo en segundo plano mientras la universidad lo permita."""
 import datetime as dt
+import json
 import logging
+import os
 import re
 import webbrowser
 
@@ -20,17 +25,101 @@ def _fecha(iso):
     return dt.datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
 
 
+class SesionExpirada(Exception):
+    pass
+
+
 class Canvas:
-    def __init__(self, url, token):
+    def __init__(self, url, token, carpeta_datos=None):
         self.url = (url or "https://utah.instructure.com").rstrip("/")
         self.token = (token or "").strip()
         self._cursos = None
+        self.carpeta = carpeta_datos or "."
+        self.ruta_cookies = os.path.join(self.carpeta, "canvas_sesion.json")
+        self.perfil = os.path.join(self.carpeta, "navegador_canvas")
+        self.web = requests.Session()
+        self.web.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JARVIS"
+        self._cargar_cookies()
+
+    # ---------- sesión del navegador ----------
+    @property
+    def conectado(self):
+        return bool(self.token or self.web.cookies)
+
+    def _cargar_cookies(self):
+        if os.path.exists(self.ruta_cookies):
+            try:
+                with open(self.ruta_cookies, encoding="utf-8") as f:
+                    for c in json.load(f):
+                        self.web.cookies.set(c["name"], c["value"], domain=c["domain"], path=c.get("path", "/"))
+            except Exception as e:
+                log.warning("Cookies de Canvas: %s", e)
+
+    def iniciar_sesion(self, visible=True, espera=300):
+        """Abre Edge con un perfil propio de JARVIS. Visible: el usuario inicia sesión (uNID + Duo).
+        Invisible: reutiliza la sesión guardada para renovar las cookies sin molestar."""
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            ctx = None
+            exe = os.environ.get("JARVIS_NAVEGADOR")
+            opciones = ([{"executable_path": exe}] if exe else []) + [{"channel": "msedge"}, {"channel": "chrome"}, {}]
+            for op in opciones:
+                try:
+                    ctx = p.chromium.launch_persistent_context(self.perfil, headless=not visible,
+                                                               viewport={"width": 1100, "height": 800}, **op)
+                    break
+                except Exception as e:
+                    log.warning("Navegador %s no disponible: %s", op, str(e)[:120])
+            if ctx is None:
+                raise RuntimeError("No encontré Edge ni Chrome.")
+            try:
+                pagina = ctx.pages[0] if ctx.pages else ctx.new_page()
+                pagina.goto(self.url, wait_until="domcontentloaded", timeout=60000)
+                limite = dt.datetime.now() + dt.timedelta(seconds=espera if visible else 25)
+                while dt.datetime.now() < limite:
+                    u = pagina.url
+                    if u.startswith(self.url) and "/login" not in u:
+                        try:
+                            pagina.wait_for_selector("#application, #dashboard, .ic-app", timeout=5000)
+                        except Exception:
+                            pass
+                        host = self.url.split("//")[1].split("/")[0].split(":")[0]
+                        cookies = [c for c in ctx.cookies() if "instructure" in c["domain"] or
+                                   c["domain"].lstrip(".") in host or host.endswith(c["domain"].lstrip("."))]
+                        os.makedirs(self.carpeta, exist_ok=True)
+                        with open(self.ruta_cookies, "w", encoding="utf-8") as f:
+                            json.dump(cookies, f)
+                        self.web.cookies.clear()
+                        self._cargar_cookies()
+                        self._cursos = None
+                        return True
+                    pagina.wait_for_timeout(1500)
+                return False
+            finally:
+                ctx.close()
 
     def _get(self, ruta, **params):
-        r = requests.get(f"{self.url}/api/v1/{ruta}", headers={"Authorization": f"Bearer {self.token}"},
-                         params={"per_page": 50, **params}, timeout=20)
-        r.raise_for_status()
-        return r.json()
+        params = {"per_page": 50, **params}
+        if self.token:
+            r = requests.get(f"{self.url}/api/v1/{ruta}", headers={"Authorization": f"Bearer {self.token}"},
+                             params=params, timeout=20)
+            r.raise_for_status()
+            return r.json()
+        for intento in range(2):
+            r = self.web.get(f"{self.url}/api/v1/{ruta}", params=params, timeout=20, allow_redirects=False)
+            if r.status_code == 200:
+                texto = r.text
+                if texto.startswith("while(1);"):  # Canvas protege el JSON en sesiones de navegador
+                    texto = texto[len("while(1);"):]
+                return json.loads(texto)
+            if intento == 0 and r.status_code in (301, 302, 401, 403):
+                try:  # renovar la sesión en segundo plano, sin ventana
+                    if self.iniciar_sesion(visible=False):
+                        continue
+                except Exception as e:
+                    log.warning("No pude renovar la sesión de Canvas: %s", e)
+            raise SesionExpirada("La sesión de Canvas expiró")
+        raise SesionExpirada("La sesión de Canvas expiró")
 
     def cursos(self):
         if self._cursos is None:
@@ -83,7 +172,7 @@ class Canvas:
         return salida
 
     def texto(self, que="pendientes"):
-        if not self.token:
+        if not self.conectado:
             return "Canvas no está conectado."
         que = (que or "pendientes").lower()
         if "anunc" in que:
@@ -106,7 +195,7 @@ class Canvas:
 
     def abrir(self, busqueda=None):
         url = self.url
-        if busqueda and self.token:
+        if busqueda and self.conectado:
             b = busqueda.lower()
             for i in self.pendientes() + self.anuncios():
                 if b in i["titulo"].lower() or b in i["curso"].lower():

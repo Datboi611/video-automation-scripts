@@ -41,7 +41,7 @@ REGLAS:
 - Si te pide algo, HAZLO con herramientas en vez de explicar cómo.
 - "¿Qué tengo hoy?", "deberes", "pendientes", "tareas" -> resumen_del_dia, y comenta lo atrasado.
 - "Marca X como hecha" -> marcar_hecho.
-- "Conecta Canvas" -> pedir_dato canvas_token. "Conecta mi correo" -> pedir_dato correo_email.
+- "Conecta Canvas" / "inicia sesión en Canvas" -> canvas_iniciar_sesion. "Conecta mi correo" -> pedir_dato correo_email.
 - "Conecta mi iPhone/Telegram" -> pedir_dato telegram_bot_token. "Que me llames" -> pedir_dato telegram_usuario.
 - Si necesitas un dato que el usuario debe escribir (token, enlace, clave, contraseña de aplicación) usa pedir_dato con el campo correcto; se guarda solo.
 - Si no entendiste una orden compleja, usa pedir_texto para que te la escriba.

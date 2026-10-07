@@ -86,6 +86,7 @@ SPECS = [
     ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
      {"que": (S, "pendientes | anuncios | notas | cursos")}, []),
     ("canvas_abrir", "Abre Canvas en el navegador (un curso o una tarea concreta).", {"busqueda": (S, "Curso o tarea, opcional")}, []),
+    ("canvas_iniciar_sesion", "Abre una ventana para que el usuario inicie sesión en Canvas (uNID + Duo) una vez; JARVIS guarda la sesión. Úsalo para 'conecta Canvas'.", {}),
     ("correo", "Lee correos (personal y de la universidad): no leídos o buscando un texto.",
      {"cuenta": (S, "personal/universidad, opcional"), "buscar": (S, "Texto a buscar, opcional"),
       "solo_no_leidos": ("boolean", "Solo no leídos (por defecto sí)")}, []),
@@ -152,7 +153,7 @@ CATEGORIAS = {
                 "borrar_recordatorio"}),
     "correo": (r"correo|mail|inbox|bandeja|mensaje de|escrib.* a |responde", {"correo", "enviar_correo"}),
     "canvas": (r"canvas|curso|clase|profe|nota|calificaci|entrega|assignment|anuncio|universidad|homework|quiz|tarea",
-               {"canvas", "canvas_abrir"}),
+               {"canvas", "canvas_abrir", "canvas_iniciar_sesion"}),
     "musica": (r"m[uú]sica|canci|pon |reproduc|playlist|youtube|apple|spotify|pausa|reanuda|volumen|sube|baja|"
                r"siguiente|anterior|play|song|music|det[eé]n|calla|silencio",
                {"poner_musica", "controlar_musica", "apple_music", "controlar_multimedia", "controlar_volumen"}),
@@ -674,11 +675,31 @@ class Herramientas:
 
 
     def canvas(self, que="pendientes"):
+        from .canvas import SesionExpirada
         cv = self.agenda.get("canvas")
-        if not cv or not cv.token:
-            self.pedir_dato("canvas_token")
-            return "Canvas no está conectado: abrí la barra para que pegue su token. Díselo brevemente."
-        return cv.texto(que)
+        if not cv or not cv.conectado:
+            return self.canvas_iniciar_sesion()
+        try:
+            return cv.texto(que)
+        except SesionExpirada:
+            return self.canvas_iniciar_sesion()
+
+    def canvas_iniciar_sesion(self):
+        import threading
+        cv = self.agenda["canvas"]
+
+        def abrir():
+            try:
+                ok = cv.iniciar_sesion(visible=True)
+            except Exception as e:
+                log.warning("Login Canvas: %s", e)
+                ok = False
+            if getattr(self, "al_conectar_canvas", None):
+                self.al_conectar_canvas(ok)
+
+        threading.Thread(target=abrir, daemon=True).start()
+        return ("Abrí una ventana de Canvas: el usuario debe iniciar sesión con su uNID y aprobar Duo; "
+                "la ventana se cierra sola al terminar. Díselo en una frase.")
 
     def canvas_abrir(self, busqueda=None):
         return self.agenda["canvas"].abrir(busqueda)
@@ -688,11 +709,31 @@ class Herramientas:
 
 
     def canvas(self, que="pendientes"):
+        from .canvas import SesionExpirada
         cv = self.agenda.get("canvas")
-        if not cv or not cv.token:
-            self.pedir_dato("canvas_token")
-            return "Canvas no está conectado: abrí la barra para que pegue su token. Díselo brevemente."
-        return cv.texto(que)
+        if not cv or not cv.conectado:
+            return self.canvas_iniciar_sesion()
+        try:
+            return cv.texto(que)
+        except SesionExpirada:
+            return self.canvas_iniciar_sesion()
+
+    def canvas_iniciar_sesion(self):
+        import threading
+        cv = self.agenda["canvas"]
+
+        def abrir():
+            try:
+                ok = cv.iniciar_sesion(visible=True)
+            except Exception as e:
+                log.warning("Login Canvas: %s", e)
+                ok = False
+            if getattr(self, "al_conectar_canvas", None):
+                self.al_conectar_canvas(ok)
+
+        threading.Thread(target=abrir, daemon=True).start()
+        return ("Abrí una ventana de Canvas: el usuario debe iniciar sesión con su uNID y aprobar Duo; "
+                "la ventana se cierra sola al terminar. Díselo en una frase.")
 
     def canvas_abrir(self, busqueda=None):
         return self.agenda["canvas"].abrir(busqueda)

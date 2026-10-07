@@ -66,6 +66,7 @@ def respuesta_rapida(texto, idioma, cfg):
 
 
 PANEL = {  # herramienta -> título del menú lateral donde se muestra su resultado
+    "canvas": "Canvas",
     "resumen_del_dia": "Tu día", "calendario": "Calendario", "todoist": "Todoist", "pendientes": "Pendientes",
     "listar_recordatorios": "Recordatorios", "correo": "Correo", "clima": "Clima", "info_sistema": "Sistema",
     "ver_pantalla": "Lo que veo", "buscar_archivos": "Archivos", "listar_carpeta": "Carpeta",
@@ -156,7 +157,7 @@ class Jarvis:
             "todoist": Todoist(c["agenda"]["todoist_token"]),
             "pendientes": Pendientes(os.path.join(config.DATOS, "pendientes.json")),
             "correo": Correo(c.get("correo", [])),
-            "canvas": Canvas(c["agenda"].get("canvas_url"), c["agenda"].get("canvas_token")),
+            "canvas": Canvas(c["agenda"].get("canvas_url"), c["agenda"].get("canvas_token"), config.DATOS),
         }
         self.habilidades = Habilidades(os.path.join(config.BASE, "habilidades"))
         self.herramientas = Herramientas(self.memoria, self.recordatorios, self.telefono, cfg=c,
@@ -164,6 +165,7 @@ class Jarvis:
         self.herramientas.musica = Musica(self.ui)
         self.herramientas.ui = self.ui
         self.herramientas.claude = ClaudeCode(self.claude_termino)
+        self.herramientas.al_conectar_canvas = self.canvas_conectado
         self.herramientas.on_resultado = self.mostrar_resultado
         self.cerebro = Cerebro(c, self.herramientas, self.memoria, self.habilidades)
         self.recordatorios.iniciar()
@@ -218,6 +220,18 @@ class Jarvis:
                 self.ui("panel", PANEL[nombre], paneles.desde_texto(resultado))
         except Exception:
             log.exception("No pude armar el panel")
+
+    def canvas_conectado(self, ok):
+        t = self.cfg["tratamiento"]
+        if not ok:
+            return self.decir(f"No se completó el inicio de sesión en Canvas, {t}. Lo intentamos cuando quiera.")
+        try:
+            n = len(self.herramientas.agenda["canvas"].cursos())
+            self.decir(f"Canvas conectado, {t}. Vigilo sus {n} cursos; ninguna tarea nueva pasará desapercibida.")
+            self.mostrar_resultado("canvas", {}, self.herramientas.canvas("pendientes"))
+        except Exception:
+            log.exception("Canvas tras login")
+            self.decir(f"Inicié sesión, {t}, pero Canvas no me dejó leer los cursos. Revisaré más tarde.")
 
     def claude_termino(self, tarea, resultado, ok):
         t = self.cfg["tratamiento"]
