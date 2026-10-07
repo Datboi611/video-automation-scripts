@@ -40,6 +40,7 @@ DEFAULTS = {
     "vigilante": {"resumen_matutino": "08:00", "revisiones": ["14:00", "19:00"], "aviso_eventos_min": 30,
                   "llamar_si_pendiente": True, "hora_llamada": "20:30", "silencio": ["23:00", "07:30"],
                   "correo_cada_min": 15, "canvas_cada_min": 30, "correo_importante": ""},
+    "presencia": {"telefono_mac": "", "minutos_ausencia": 10},
     "idioma": "es",  # "es" = siempre español; "auto" = español o inglés según cómo hables
     "minutos_reposo": 30,
     "segundos_silencio": 1.6,

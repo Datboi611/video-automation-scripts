@@ -23,6 +23,7 @@ from core.telegram_bot import BotTelegram
 from core.vigilante import Vigilante
 from core.claude_code import ClaudeCode
 from core.canvas import Canvas
+from core.presencia import Presencia, normalizar_mac
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -123,6 +124,8 @@ class Jarvis:
         self.lock_voz = threading.Lock()
         self.escucha = None
         self.bot = None
+        self.presencia = None
+        self.avisos_ausente = []
         self.activos = 0
         self._n = 0
 
@@ -193,6 +196,9 @@ class Jarvis:
         self.iniciar_bot()
         self.vigilante = Vigilante(c, self, os.path.join(config.DATOS, "avisos.json"))
         self.vigilante.iniciar()
+        # ¿estás en casa? (iPhone en el mismo WiFi) -> puede hablar; si no, silencio y todo por Telegram
+        self.presencia = Presencia(c, self.salio_de_casa, self.volvio_a_casa)
+        self.presencia.iniciar()
 
         if not self.cerebro.proveedores:
             self.ui("pedirTexto", "Falta tu clave de Groq en config.json")
@@ -220,6 +226,35 @@ class Jarvis:
                 self.ui("panel", PANEL[nombre], paneles.desde_texto(resultado))
         except Exception:
             log.exception("No pude armar el panel")
+
+    # ---------- Presencia ----------
+    def puede_hablar(self):
+        return not self.presencia or self.presencia.presente
+
+    def avisar_por_voz(self, texto):
+        """Avisos por iniciativa propia: los dice si estás en casa; si no, los guarda para cuando vuelvas."""
+        if self.puede_hablar():
+            self.decir(texto)
+        else:
+            self.avisos_ausente.append(texto)
+
+    def salio_de_casa(self):
+        if self.escucha:
+            self.escucha.dormir()
+        self.ui("setHint", "Fuera de casa: modo silencioso, todo va a tu Telegram")
+        if self.bot:
+            self.bot.enviar(f"🚪 Detecté que salió de casa, {self.cfg['tratamiento']}. Modo silencioso: le aviso todo por aquí.")
+
+    def volvio_a_casa(self):
+        t = self.cfg["tratamiento"]
+        if self.escucha:
+            self.escucha.actividad()
+        pendientes, self.avisos_ausente = self.avisos_ausente, []
+        msg = f"Bienvenido de vuelta, {t}."
+        if pendientes:
+            msg += f" Mientras no estaba hubo {len(pendientes)} novedades. La más reciente: {pendientes[-1]}"
+        self.ui("setHint", "Te escucho siempre")
+        self.decir(msg)
 
     def canvas_conectado(self, ok):
         t = self.cfg["tratamiento"]
@@ -308,6 +343,16 @@ class Jarvis:
                     msg = f"Correo conectado, {c['tratamiento']}. Le avisaré solo de lo que importe."
                 except Exception:
                     msg = "El correo rechazó esa contraseña. Asegúrese de usar una contraseña de aplicación, no la normal."
+        elif campo == "telefono_mac":
+            mac = normalizar_mac(valor)
+            if not mac:
+                return self.decir("Esa dirección no parece válida, jefe. Son 12 caracteres, como a1:b2:c3:d4:e5:f6.")
+            c.setdefault("presencia", {})["telefono_mac"] = mac
+            config.guardar_valor(["presencia", "telefono_mac"], mac)
+            visto = self.presencia.visto()
+            msg = (f"Listo, {c['tratamiento']}. Veo su iPhone en la red: cuando salga de casa me callaré." if visto else
+                   f"Guardado, {c['tratamiento']}, pero no veo su iPhone en este WiFi ahora. "
+                   "Revise que la dirección Wi-Fi privada esté en modo fija.")
         elif campo == "telegram_usuario":
             u = valor if valor.startswith("@") else "@" + valor
             c["telefono"]["telegram_usuario"] = u
@@ -415,7 +460,9 @@ class Jarvis:
             except Exception as e:
                 log.warning("Aviso al teléfono falló: %s", e)
         self.ui("panel", "Recordatorio", r["mensaje"])
-        self.decir(aviso)
+        if self.bot and not self.puede_hablar():
+            self.bot.enviar("⏰ " + aviso)
+        self.avisar_por_voz(aviso)
 
     def orden_remota(self, texto):
         respuesta = self.procesar(texto, hablar=False)

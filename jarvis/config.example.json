@@ -98,5 +98,9 @@
     "correo_cada_min": 15,
     "canvas_cada_min": 30,
     "correo_importante": ""
+  },
+  "presencia": {
+    "telefono_mac": "",
+    "minutos_ausencia": 10
   }
 }

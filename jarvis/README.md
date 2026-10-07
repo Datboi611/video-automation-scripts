@@ -63,6 +63,11 @@ Ejemplos:
 - **Canvas** (cada 30 min): tareas nuevas, anuncios, notas publicadas y entregas faltantes. Dile «conecta Canvas»: se abre una ventana de Edge, inicias sesión con tu uNID y apruebas Duo **una vez**; JARVIS guarda la sesión y la renueva solo. Si la universidad la cierra, te avisa por Telegram. (Si tu universidad permite tokens, también puedes pegar uno en `canvas_token`.) También puedes pedirle «¿qué tengo en Canvas?», «abre Canvas de física», «¿hay anuncios nuevos?».
 - Ajustes en `config.json` → `vigilante` (`correo_cada_min`, `canvas_cada_min`, `correo_importante` para decirle qué consideras importante).
 
+## Sabe si estás en casa
+
+Si tu iPhone está en el mismo WiFi que el PC, JARVIS habla; si sales (10 min sin verlo) se calla, deja de escuchar y te avisa todo por Telegram. Al volver te saluda y resume lo que pasó.
+Configúralo diciendo «detecta cuando salgo de casa» y escribe la **Dirección Wi-Fi** de tu iPhone (Ajustes → Wi-Fi → ⓘ junto a tu red). En esa misma pantalla pon **Dirección Wi-Fi privada: Fija** (no «Rotativa»).
+
 ## JARVIS + tu Claude (Claude Code)
 
 JARVIS le encarga a Claude las tareas grandes (programar, crear documentos, automatizar, investigar a fondo) usando tu plan de Claude. Claude las hace en el PC en segundo plano y JARVIS te avisa (también por Telegram) al terminar.

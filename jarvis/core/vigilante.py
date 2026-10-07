@@ -69,8 +69,8 @@ class Vigilante:
                 pass
         if voz is not False and not self._silencio(dt.datetime.now()):
             hablado = voz or re.sub(r"[^\w\s,.:;¿?¡!áéíóúñÁÉÍÓÚÑ()/-]", "", texto.split("\n")[0]).strip()
-            try:
-                threading.Thread(target=self.j.decir, args=(hablado,), daemon=True).start()
+            try:  # solo habla si el usuario está en casa (si no, lo guarda para cuando vuelva)
+                threading.Thread(target=self.j.avisar_por_voz, args=(hablado,), daemon=True).start()
             except Exception:
                 pass
 
