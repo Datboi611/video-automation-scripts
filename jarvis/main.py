@@ -19,6 +19,7 @@ from core.correo import Correo
 from core.integraciones import Calendario, Pendientes, Todoist
 from core.musica import Musica
 from core import paneles
+from core.acotaciones import acotacion
 from core.telegram_bot import BotTelegram
 from core.vigilante import Vigilante
 from core.claude_code import ClaudeCode
@@ -55,7 +56,7 @@ def respuesta_rapida(texto, idioma, cfg):
     if re.search(r"qu[eé] hora es|what time is it|dime la hora", t):
         if idioma == "en":
             return f"It's {ahora.strftime('%I:%M %p').lstrip('0')}, {cfg.get('tratamiento_en', 'boss')}."
-        return f"Son las {ahora.strftime('%H:%M')}, {cfg['tratamiento']}."
+        return f"Son las {ahora.strftime('%H:%M')}, {cfg['tratamiento']}." + acotacion("hora", cfg)
     if re.search(r"qu[eé] (d[ií]a|fecha) es hoy|what('s| is) (the date|today)", t):
         meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
                  "octubre", "noviembre", "diciembre"]
@@ -96,14 +97,14 @@ def accion_rapida(texto, herr, cfg):
             r = herr.ejecutar("abrir_aplicacion", {"nombre": destino})
             if r.startswith("No encontr"):
                 return None  # que lo resuelva la IA
-        return f"Abriendo {destino}, {j}."
+        return f"Abriendo {destino}, {j}." + acotacion("abrir", cfg, herr)
     m = re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:algo de |m[uú]sica de |la canci[oó]n |canciones de |m[uú]sica )?(.+)$", t)
     if m and herr.musica and not re.search(r"\b(alarma|recordatorio|timer|temporizador)\b", t):
         r = herr.ejecutar("poner_musica", {"busqueda": m.group(1), "varias": True})
-        return r if r.startswith("No") else f"Enseguida, {j}. {r}"
+        return r if r.startswith("No") else f"Enseguida, {j}. {r}" + acotacion("musica", cfg, herr)
     if re.fullmatch(r"(pausa|pausar|pausa la m[uú]sica|para la m[uú]sica|det[eé]n la m[uú]sica|stop|silencio)", t):
         herr.ejecutar("controlar_musica", {"accion": "pausar"})
-        return "Hecho."
+        return "Hecho." + acotacion("pausa", cfg, herr)
     if re.fullmatch(r"(contin[uú]a|reanuda|sigue)( la m[uú]sica)?|play", t):
         herr.ejecutar("controlar_musica", {"accion": "reanudar"})
         return "Reanudando."
@@ -120,18 +121,18 @@ def accion_rapida(texto, herr, cfg):
         if minutos:
             r = herr.ejecutar("crear_recordatorio", {"mensaje": motivo or "Llamada programada", "en_minutos": int(minutos),
                                                      "llamar": True})
-            return f"Le llamaré en {minutos} minutos, {j}." if r.startswith("Recordatorio") else r
+            return (f"Le llamaré en {minutos} minutos, {j}." + acotacion("llamada", cfg, herr)) if r.startswith("Recordatorio") else r
         msg = (f"{j.capitalize()}, le habla JARVIS. " + (f"Le recuerdo: {motivo}." if motivo
                else "Esta es una llamada de prueba. Todo funciona correctamente."))
         r = herr.ejecutar("llamar_telefono", {"mensaje": msg})
-        return f"Llamándole ahora, {j}." if r.startswith("Llamando") or r.startswith("Llamada") else r
+        return (f"Llamándole ahora, {j}." + acotacion("llamada", cfg, herr)) if r.startswith(("Llamando", "Llamada")) else r
     m = re.match(r"^(?:m[aá]ndame|env[ií]ame|escr[ií]beme|manda|env[ií]a)\s+(?:un\s+)?(?:mensaje|texto|nota|aviso)?"
                  r"\s*(?:(?:por|al|a mi|a)\s+(?:telegram|celular|tel[eé]fono|iphone|m[oó]vil))?\s*"
                  r"(?:diciendo|que diga|con|que|:)?\s*(.*)$", t)
     if m and re.search(r"mensaje|texto|nota|aviso|telegram|celular|tel[eé]fono|iphone", t):
         cuerpo = re.sub(r"^(de )?prueba$", "", m.group(1).strip()) or "Prueba de JARVIS ✅ Todo funciona, jefe."
         r = herr.ejecutar("notificar_telefono", {"mensaje": cuerpo[:1].upper() + cuerpo[1:]})
-        return f"Enviado a su iPhone, {j}." if r.startswith("Mensaje enviado") or r.startswith("Notificación") else r
+        return (f"Enviado a su iPhone, {j}." + acotacion("mensaje", cfg, herr)) if r.startswith(("Mensaje enviado", "Notificación")) else r
     if re.search(r"\b(revisa|checa|chequea|mira|lee|tengo|hay)\b.*\b(correo|correos|mail|mails|email|inbox|bandeja)\b", t):
         r = herr.ejecutar("correo", {"solo_no_leidos": True})
         if "no está conectado" in r:
@@ -144,13 +145,14 @@ def accion_rapida(texto, herr, cfg):
         de, _, resto = correos[0].partition(":")
         asunto = resto.split("—")[0].strip()
         return (f"Tiene {len(correos)} correo{'s' if len(correos) > 1 else ''} sin leer, {j}. "
-                f"El más reciente es de {de.strip()}: {asunto}. Le dejé el resto en el panel.")
+                f"El más reciente es de {de.strip()}: {asunto}. Le dejé el resto en el panel." + acotacion("correo", cfg, herr))
     if re.fullmatch(r"(haz|hazte|corre|ejecuta)( un)? (diagn[oó]stico|chequeo|revisi[oó]n)( del sistema| de todo)?|diagn[oó]stico", t):
         return herr.ejecutar("diagnostico", {})
     m = re.match(r"^(?:marca|marcar|completa|tacha)\s+(.+?)\s+como\s+(?:hech[ao]|completad[ao]|terminad[ao]|lista|listo)$", t) \
         or re.match(r"^(?:ya )?(?:hice|termin[eé]|complet[eé])\s+(?:el |la |los |las )?(.+)$", t)
     if m:
-        return herr.ejecutar("marcar_hecho", {"texto": m.group(1)})
+        r = herr.ejecutar("marcar_hecho", {"texto": m.group(1)})
+        return r + (acotacion("hecho", cfg, herr, 0.6) if not r.startswith("No encontr") else "")
     return None
 
 
