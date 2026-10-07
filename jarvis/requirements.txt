@@ -5,7 +5,7 @@ vosk
 openai>=1.40
 requests
 edge-tts
-pygame>=2.5
+pygame-ce>=2.5
 pyttsx3
 psutil
 pyautogui

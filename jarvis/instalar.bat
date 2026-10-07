@@ -4,11 +4,17 @@ cd /d "%~dp0"
 echo.
 echo   === Instalando J.A.R.V.I.S. ===
 echo.
-where python >nul 2>nul || (echo [!] Instala Python 3.12 desde https://www.python.org/downloads/ marcando "Add python.exe to PATH" & pause & exit /b 1)
-if not exist .venv python -m venv .venv
+set PY=
+py -3.12 --version >nul 2>nul && set "PY=py -3.12"
+if not defined PY python --version >nul 2>nul && set "PY=python"
+if not defined PY (echo [!] Instala Python 3.12 desde https://www.python.org/downloads/release/python-31210/ marcando "Add python.exe to PATH" & pause & exit /b 1)
+echo Usando:
+%PY% --version
+if exist .venv rmdir /s /q .venv
+%PY% -m venv .venv || (echo [!] No pude crear el entorno & pause & exit /b 1)
 call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt || (echo [!] Error instalando dependencias & pause & exit /b 1)
+python -m pip install --upgrade pip setuptools wheel
+pip install --prefer-binary -r requirements.txt || (echo [!] Error instalando dependencias & pause & exit /b 1)
 if not exist modelos mkdir modelos
 if not exist modelos\vosk-model-small-en-us-0.15 (
   echo Descargando detector de palabra de activacion...
