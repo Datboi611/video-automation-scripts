@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>J.A.R.V.I.S.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <header>
+    <div class="brand">J.A.R.V.I.S.<span>Just A Rather Very Intelligent System</span></div>
+    <div class="clock"><div id="hora">--:--</div><div id="fecha"></div></div>
+  </header>
+
+  <aside class="stats">
+    <div class="stat"><label>CPU</label><div class="bar"><i id="cpu"></i></div><b id="cpu-v">--</b></div>
+    <div class="stat"><label>RAM</label><div class="bar"><i id="ram"></i></div><b id="ram-v">--</b></div>
+    <div class="stat" id="bat-box"><label>BAT</label><div class="bar"><i id="bat"></i></div><b id="bat-v">--</b></div>
+  </aside>
+
+  <main>
+    <canvas id="orb" title="Toca para hablar"></canvas>
+    <div class="estado"><span id="estado">INICIANDO SISTEMAS</span><small id="hint">Cargando…</small></div>
+  </main>
+
+  <section class="chat">
+    <div id="log"></div>
+    <form id="form" autocomplete="off">
+      <input id="entrada" placeholder="Escribe una orden… (o di «Jarvis»)">
+      <button aria-label="Enviar">➤</button>
+    </form>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

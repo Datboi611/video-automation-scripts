@@ -1,0 +1,40 @@
+{
+  "nombre_usuario": "",
+  "tratamiento": "señor",
+
+  "activacion": {
+    "palabra": "jarvis",
+    "aplausos": true,
+    "umbral_aplauso": 0.30
+  },
+
+  "llm": {
+    "_ayuda": "Se usan en orden; si uno falla pasa al siguiente. Claves gratis: console.groq.com/keys y aistudio.google.com/apikey",
+    "proveedores": [
+      { "nombre": "groq",   "api_key": "", "modelo": "llama-3.3-70b-versatile" },
+      { "nombre": "gemini", "api_key": "", "modelo": "gemini-2.5-flash" },
+      { "nombre": "ollama", "modelo": "qwen2.5:7b", "url": "http://localhost:11434/v1" }
+    ]
+  },
+
+  "stt": { "_ayuda": "auto = Groq si hay clave, si no Whisper local", "motor": "auto", "modelo_local": "small" },
+
+  "voz": {
+    "_ayuda": "Voces: es-MX-JorgeNeural, es-ES-AlvaroNeural, es-CO-GonzaloNeural, es-AR-TomasNeural, es-PE-AlexNeural. motor: edge u offline",
+    "motor": "edge",
+    "voz": "es-MX-JorgeNeural",
+    "velocidad": "+8%"
+  },
+
+  "telefono": {
+    "_ayuda": "ntfy_tema: nombre largo y secreto (ej. jarvis-diego-8f3k2q). telegram_usuario: tu @usuario de Telegram",
+    "ntfy_servidor": "https://ntfy.sh",
+    "ntfy_tema": "",
+    "telegram_usuario": "",
+    "control_remoto": false
+  },
+
+  "conversacion_continua": true,
+  "segundos_conversacion": 6,
+  "microfono": null
+}

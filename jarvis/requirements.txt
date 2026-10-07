@@ -1,0 +1,15 @@
+pywebview>=5.0
+sounddevice
+numpy
+vosk
+openai>=1.40
+requests
+edge-tts
+pygame>=2.5
+pyttsx3
+psutil
+pyautogui
+pyperclip
+pycaw
+comtypes
+faster-whisper
