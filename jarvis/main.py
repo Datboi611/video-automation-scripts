@@ -113,6 +113,7 @@ def accion_rapida(texto, herr, cfg):
     if re.fullmatch(r"(siguiente|la siguiente|siguiente canci[oó]n|next|cambia de canci[oó]n|otra canci[oó]n)", t):
         return herr.ejecutar("controlar_musica", {"accion": "siguiente"})
     # llamadas y mensajes al teléfono: directo, sin depender de la IA
+    t = re.sub(r"^(?:haz|has|realiza|hazme|inicia)\s+(?:la|una)\s+llamada(?:\s+ahora)?", "llámame", t)
     m = re.match(r"^(?:ll[aá]mame|hazme una llamada|llama a mi (?:celular|tel[eé]fono|iphone))"
                  r"(?:\s+en\s+(\d+)\s*(?:minutos?|min))?(?:\s*(?:para|y|a)\s+(.*))?$", t)
     if m:
