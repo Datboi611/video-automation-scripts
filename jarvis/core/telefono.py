@@ -31,6 +31,7 @@ class Telefono:
             if t.get(k):
                 t[k] = normalizar_numero(t[k])
         self.cfg_tel = t
+        self.solo_alerta = False
         self.servidor = t["ntfy_servidor"].rstrip("/")
         self.tema = t["ntfy_tema"].strip()
         self.telegram = t["telegram_usuario"].strip()
@@ -72,10 +73,20 @@ class Telefono:
             {**base, "Url": "https://twimlets.com/message?" + urllib.parse.urlencode({"Message[0]": mensaje[:500]}),
              "Method": "GET"},
         ]
+        # Cuenta de prueba: solo admite las plantillas de Twilio. El teléfono suena igual (alerta real)
+        # y el mensaje completo llega por Telegram en texto y nota de voz.
+        plantillas = [{**base, "Url": f"https://webhooks.twilio.com/v1/Voice/Template/{p}"}
+                      for p in ("voice_text_to_speech", "voice_say", "voice_speech_recognition")]
         ultimo = ""
-        for datos in intentos:
+        orden = plantillas + intentos if self.solo_alerta else intentos + plantillas
+        for datos in orden:
+            n = len(intentos) if datos in plantillas else 0
             r = requests.post(url_api, auth=(t["twilio_sid"], t["twilio_token"]), timeout=20, data=datos)
             if r.status_code < 400:
+                if n >= len(intentos):
+                    self.solo_alerta = True
+                    return "Llamando a su teléfono (cuenta de prueba: el mensaje va por Telegram)."
+                self.solo_alerta = False
                 return "Llamando a su teléfono."
             try:
                 ultimo = r.json().get("message", r.text[:200])
