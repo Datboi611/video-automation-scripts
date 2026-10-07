@@ -26,8 +26,9 @@ DEFAULTS = {
     },
     "stt": {"motor": "auto", "modelo_local": "small"},
     # Mayordomo: español castellano formal y británico en inglés, algo más grave y pausado
+    # Voz natural: sin alterar el tono (bajarlo distorsiona). motor "elevenlabs" = la más humana (opcional).
     "voz": {"motor": "edge", "voz": "es-ES-AlvaroNeural", "voz_en": "en-GB-RyanNeural",
-            "velocidad": "-2%", "tono": "-6Hz"},
+            "velocidad": "+0%", "tono": "+0Hz", "elevenlabs_api_key": "", "elevenlabs_voz": "JBFqnCBsd6RMkjVDRZzb"},
     "agenda": {"google_calendar_ics": "", "todoist_token": ""},
     "telefono": {
         "ntfy_servidor": "https://ntfy.sh",
@@ -77,11 +78,18 @@ def _merge(base, extra):
 def _migrar(usuario, ruta):
     """Actualiza un config.json viejo a los nuevos valores por defecto."""
     v = usuario.get("_version", 1)
-    if v >= 4:
+    if v >= 5:
+        return
+    if v == 4:
+        _a_v5(usuario)
+        usuario["_version"] = 5
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 3:
         _a_v4(usuario)
-        usuario["_version"] = 4
+        _a_v5(usuario)
+        usuario["_version"] = 5
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
@@ -98,7 +106,8 @@ def _migrar(usuario, ruta):
         voz["velocidad"] = "+8%"
     usuario.setdefault("agenda", {"google_calendar_ics": "", "todoist_token": ""})
     _a_v4(usuario)
-    usuario["_version"] = 4
+    _a_v5(usuario)
+    usuario["_version"] = 5
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
 
@@ -116,6 +125,17 @@ def _a_v4(usuario):
     if voz.get("velocidad") in (None, "+8%", "+25%"):
         voz["velocidad"] = "-2%"
     voz.setdefault("tono", "-6Hz")
+
+
+def _a_v5(usuario):
+    """v5: voz natural, sin bajar el tono artificialmente."""
+    voz = usuario.setdefault("voz", {})
+    if voz.get("tono") in (None, "-6Hz", "-4Hz", "-8Hz"):
+        voz["tono"] = "+0Hz"
+    if voz.get("velocidad") in (None, "-2%"):
+        voz["velocidad"] = "+0%"
+    voz.setdefault("elevenlabs_api_key", "")
+    voz.setdefault("elevenlabs_voz", "JBFqnCBsd6RMkjVDRZzb")
 
 
 def cargar():

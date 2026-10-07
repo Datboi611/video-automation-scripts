@@ -33,12 +33,14 @@
     "modelo_local": "small"
   },
   "voz": {
-    "_ayuda": "Prueba voces con probar_voces.bat. Mayordomo: es-ES-AlvaroNeural / en-GB-RyanNeural. tono: '-6Hz' más grave",
+    "_ayuda": "Prueba voces con probar_voces.bat. motor: edge (gratis) o elevenlabs (la más humana, clave en elevenlabs_api_key)",
     "motor": "edge",
     "voz": "es-ES-AlvaroNeural",
     "voz_en": "en-GB-RyanNeural",
-    "velocidad": "-2%",
-    "tono": "-6Hz"
+    "velocidad": "+0%",
+    "tono": "+0Hz",
+    "elevenlabs_api_key": "",
+    "elevenlabs_voz": "JBFqnCBsd6RMkjVDRZzb"
   },
   "telefono": {
     "_ayuda": "ntfy_tema: nombre largo y secreto (ej. jarvis-diego-8f3k2q). telegram_usuario: tu @usuario de Telegram",
@@ -50,7 +52,7 @@
   "_ayuda_reposo": "Minutos sin hablar antes de dormirse. Despierta con 'Jarvis', doble aplauso o clic",
   "minutos_reposo": 30,
   "microfono": null,
-  "_version": 4,
+  "_version": 5,
   "agenda": {
     "_ayuda": "google_calendar_ics: Google Calendar > Configuración > tu calendario > 'Dirección secreta en formato iCal'. todoist_token: Todoist > Configuración > Integraciones > Desarrollador",
     "google_calendar_ics": "",

@@ -77,7 +77,7 @@ SPECS = [
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
     ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
-     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key"),
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key"),
       "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
     ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
@@ -132,7 +132,7 @@ SPECS = [
      {"nombre": (S, "nombre_corto"), "descripcion": (S, "Qué hace y qué argumentos recibe"), "codigo": (S, "Código Python completo")}),
     ("usar_habilidad", "Ejecuta una habilidad instalada.", {"nombre": (S, "Nombre"), "argumentos": ("object", "Argumentos")}, ["nombre"]),
     ("instalar_paquete", "Instala un paquete de Python (pip) que necesite una habilidad.", {"paquete": (S, "Paquete")}),
-    ("cambiar_voz", "Cambia la voz de JARVIS.", {"voz": (S, "Voz de edge-tts, p. ej. es-MX-JorgeNeural, en-US-AndrewMultilingualNeural"), "idioma": (S, "es/en")}, ["voz"]),
+    ("cambiar_voz", "Cambia la voz de JARVIS. Para la voz más humana (ElevenLabs) usa pedir_dato con elevenlabs_api_key.", {"voz": (S, "Voz de edge-tts, p. ej. es-MX-JorgeNeural, en-US-AndrewMultilingualNeural"), "idioma": (S, "es/en")}, ["voz"]),
 ]
 
 
@@ -635,7 +635,8 @@ class Herramientas:
                   "google_calendar_ics": "Pega la dirección secreta iCal de Google Calendar",
                   "gemini_api_key": "Pega tu clave de Gemini (aistudio.google.com/apikey)",
                   "claude_api_key": "Pega tu clave de API de Claude (console.anthropic.com)",
-                  "groq_api_key": "Pega tu clave de Groq"}
+                  "groq_api_key": "Pega tu clave de Groq",
+                  "elevenlabs_api_key": "Pega tu clave de ElevenLabs (elevenlabs.io → API Keys)"}
         if campo not in textos:
             return f"Campo no válido. Opciones: {', '.join(textos)}."
         if getattr(self, "ui", None):

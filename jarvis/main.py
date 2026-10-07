@@ -223,6 +223,12 @@ class Jarvis:
             else:
                 self.herramientas.agenda["calendario"].url = valor
                 msg = f"Calendario conectado, {c['tratamiento']}."
+        elif campo == "elevenlabs_api_key":
+            c["voz"]["elevenlabs_api_key"] = valor
+            c["voz"]["motor"] = "elevenlabs"
+            config.guardar_valor(["voz", "elevenlabs_api_key"], valor)
+            config.guardar_valor(["voz", "motor"], "elevenlabs")
+            msg = f"Voz nueva activada, {c['tratamiento']}. Confío en que esta le resulte bastante más humana."
         elif campo.endswith("_api_key"):
             prov = campo.replace("_api_key", "")
             lista = c["llm"]["proveedores"]

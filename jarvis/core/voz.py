@@ -59,12 +59,17 @@ class Voz:
         self._parar.clear()
         self.hablando = True
         try:
-            if self.cfg["motor"] == "edge":
+            if self.cfg["motor"] == "elevenlabs" and self.cfg.get("elevenlabs_api_key"):
+                try:
+                    return self._por_frases(texto, self._generar_11)
+                except Exception as e:  # sin cuota o sin internet: pasa a la voz gratis
+                    log.warning("ElevenLabs falló, uso edge-tts: %s", e)
+            if self.cfg["motor"] in ("edge", "elevenlabs"):
                 elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
                 respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-ES-AlvaroNeural"
                 for voz in dict.fromkeys([elegida, respaldo]):
                     try:
-                        return self._edge(texto, voz)
+                        return self._por_frases(texto, lambda t, v=voz: self._generar(t, v))
                     except Exception as e:
                         log.warning("edge-tts falló con %s: %s", voz, e)
             self._sapi(texto)
@@ -84,7 +89,22 @@ class Voz:
         asyncio.run(gen())
         return ruta
 
-    def _edge(self, texto, voz):
+    def _generar_11(self, texto):
+        import requests
+        voz = self.cfg.get("elevenlabs_voz") or "JBFqnCBsd6RMkjVDRZzb"  # George: británico, cálido
+        r = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voz}?output_format=mp3_44100_128",
+            headers={"xi-api-key": self.cfg["elevenlabs_api_key"]}, timeout=20,
+            json={"text": texto, "model_id": self.cfg.get("elevenlabs_modelo", "eleven_flash_v2_5"),
+                  "language_code": "es",
+                  "voice_settings": {"stability": 0.45, "similarity_boost": 0.8, "style": 0.25, "speed": 1.0}})
+        r.raise_for_status()
+        ruta = os.path.join(self.carpeta, f"{uuid.uuid4().hex}.mp3")
+        with open(ruta, "wb") as f:
+            f.write(r.content)
+        return ruta
+
+    def _por_frases(self, texto, generar):
         import pygame
         partes = frases(texto)
         listas = queue.Queue()
@@ -95,7 +115,7 @@ class Voz:
                 if self._parar.is_set():
                     break
                 try:
-                    listas.put(self._generar(p, voz))
+                    listas.put(generar(p))
                 except Exception as e:
                     error.append(e)
                     break

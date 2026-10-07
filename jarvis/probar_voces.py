@@ -9,13 +9,13 @@ from core import config  # noqa: E402
 from core.voz import Voz  # noqa: E402
 
 VOCES = [
-    ("1", "es-ES-AlvaroNeural", "-2%", "-6Hz", "Mayordomo castellano (por defecto)"),
-    ("2", "es-MX-JorgeNeural", "-2%", "-8Hz", "Latino, grave"),
-    ("3", "es-AR-TomasNeural", "-2%", "-6Hz", "Rioplatense"),
-    ("4", "es-CO-GonzaloNeural", "-2%", "-6Hz", "Colombiano neutro"),
-    ("5", "en-GB-RyanNeural", "-2%", "-6Hz", "Británico (el JARVIS original, en inglés)"),
-    ("6", "en-GB-ThomasNeural", "-2%", "-4Hz", "Británico formal"),
-    ("7", "en-US-AndrewMultilingualNeural", "+0%", "-4Hz", "Multilingüe natural (habla español)"),
+    ("1", "es-ES-AlvaroNeural", "+0%", "+0Hz", "Castellano formal, natural (por defecto)"),
+    ("2", "en-US-BrianMultilingualNeural", "+0%", "+0Hz", "Multilingüe grave y pausado (habla español)"),
+    ("3", "en-US-AndrewMultilingualNeural", "+0%", "+0Hz", "Multilingüe cálido (habla español)"),
+    ("4", "es-MX-JorgeNeural", "+0%", "+0Hz", "Latino neutro"),
+    ("5", "es-US-AlonsoNeural", "+0%", "+0Hz", "Latino de EE. UU."),
+    ("6", "es-CO-GonzaloNeural", "+0%", "+0Hz", "Colombiano neutro"),
+    ("7", "en-GB-RyanNeural", "+0%", "+0Hz", "Británico (inglés)"),
 ]
 FRASE_ES = "Buenas tardes, jefe. Nada dice productividad como empezar una serie con un examen el viernes."
 FRASE_EN = "Good afternoon, sir. Nothing says productivity like starting a series with an exam on Friday."
@@ -27,6 +27,8 @@ for n, voz, vel, tono, desc in VOCES:
     Voz(cfg, config.DATOS).hablar(FRASE_EN if voz.startswith("en-GB") else FRASE_ES,
                                   "en" if voz.startswith("en-GB") else "es")
 
+print("\nLa más humana de todas es ElevenLabs (opcional, 10 min gratis al mes): dile a JARVIS")
+print("«Jarvis, activa la voz de ElevenLabs» y pega tu clave de elevenlabs.io en la barra.\n")
 eleccion = input("\nNúmero de la voz para ESPAÑOL (Enter = no cambiar): ").strip()
 eleccion_en = input("Número de la voz para INGLÉS (Enter = no cambiar): ").strip()
 for clave, num in (("voz", eleccion), ("voz_en", eleccion_en)):
