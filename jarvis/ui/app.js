@@ -140,8 +140,10 @@ window.J = {
   setStatus(txt) { $("estado").textContent = txt.toUpperCase(); },
   setHint(txt) { $("hint").textContent = txt; },
   mostrarChat() {},
-  pedirTexto(motivo) {  // la caja de texto solo aparece cuando JARVIS necesita que escribas algo
+  pedirTexto(motivo, campo) {  // la barra solo aparece cuando JARVIS necesita que escribas algo
+    campoPedido = campo || null;
     $("entrada").placeholder = motivo || "Escribe aquí…";
+    $("entrada").type = campo && /token|key/.test(campo) ? "password" : "text";
     $("chat").hidden = false;
     $("entrada").focus();
   },
@@ -160,26 +162,45 @@ window.J = {
     li.querySelector("small").textContent = paso === "hecho" ? "completado" : paso === "error" ? "error" : paso;
     li.className = paso === "hecho" ? "hecho" : paso === "error" ? "error" : "";
   },
-  panel(titulo, texto) {
+  panel(titulo, secciones) {
     const cont = $("paneles");
     const id = "pn-" + titulo.toLowerCase().replace(/[^a-z0-9]/g, "");
     document.getElementById(id)?.remove();
+    if (typeof secciones === "string") secciones = [{ t: "", tono: "info", items: secciones.split("\n").filter(Boolean).map((x) => ({ x })) }];
     const c = document.createElement("section");
     c.className = "card"; c.id = id;
     const h = document.createElement("h4");
     h.textContent = titulo.toUpperCase();
     const x = document.createElement("button"); x.textContent = "✕"; x.onclick = () => c.remove();
-    h.append(x);
-    const pre = document.createElement("pre");
-    // títulos de sección en MAYÚSCULAS seguidos de ":" se resaltan
-    texto.split("\n").forEach((l, i) => {
-      if (i) pre.append("\n");
-      if (/^[A-ZÁÉÍÓÚÑ ]{4,}( \(\d+\))?:/.test(l)) { const b = document.createElement("b"); b.textContent = l; pre.append(b); }
-      else pre.append(l);
-    });
-    c.append(h, pre);
+    h.append(x); c.append(h);
+    const cuerpo = document.createElement("div"); cuerpo.className = "secciones";
+    for (const s of secciones) {
+      const sec = document.createElement("div");
+      sec.className = "sec " + (s.tono || "info");
+      if (s.t) {
+        const st = document.createElement("h5");
+        st.textContent = s.t;
+        const n = document.createElement("span"); n.className = "n"; n.textContent = s.items.length;
+        st.append(n); sec.append(st);
+      }
+      const ul = document.createElement("ul");
+      for (const it of s.items) {
+        const li = document.createElement("li");
+        const tx = document.createElement("span"); tx.className = "tx"; tx.textContent = it.x;
+        li.append(tx);
+        if (it.sub || (it.tags && it.tags.length)) {
+          const meta = document.createElement("span"); meta.className = "meta";
+          if (it.sub) { const sb = document.createElement("small"); sb.textContent = it.sub; meta.append(sb); }
+          for (const [txt, tono] of it.tags || []) { const ch = document.createElement("em"); ch.className = "chip " + tono; ch.textContent = txt; meta.append(ch); }
+          li.append(meta);
+        }
+        ul.append(li);
+      }
+      sec.append(ul); cuerpo.append(sec);
+    }
+    c.append(cuerpo);
     cont.prepend(c);
-    while (cont.children.length > 3) cont.lastChild.remove();
+    while (cont.children.length > 2) cont.lastChild.remove();
   },
   musica(p) {
     const a = $("audio");
@@ -208,6 +229,7 @@ window.J = {
 
 const api = () => window.pywebview && window.pywebview.api;
 let volMusica = 0.6;
+let campoPedido = null;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("chat").hidden = true; });
 $("p-play").addEventListener("click", () => J.musicaControl($("audio").paused ? "reanudar" : "pausar"));
 $("p-stop").addEventListener("click", () => J.musicaControl("detener"));
@@ -220,7 +242,8 @@ $("form").addEventListener("submit", (e) => {
   if (!t) return;
   $("entrada").value = "";
   $("chat").hidden = true;
-  api() ? api().enviar(t) : J.addMsg("usuario", t);
+  if (api()) api().enviar(t, campoPedido);
+  campoPedido = null;
 });
 canvas.addEventListener("click", () => api() && api().activar());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && api()) api().detener(); });
@@ -252,7 +275,13 @@ setTimeout(() => {
   J.setHint("Vista previa — ejecuta main.py para activar a JARVIS");
   J.proceso(1, "¿Qué tengo pendiente hoy?", "resumen del dia");
   J.proceso(2, "Pon música lo-fi para estudiar", "hecho");
-  J.panel("Tu día", "CALENDARIO:\nhoy 11:00: Física 2210\nhoy 15:10: Examen licencia Utah\n\nTODOIST:\nVENCIDA ayer: Quiz 4\nhoy: Writing: Implicit Bias Test (prioridad alta)\n\nPENDIENTES PERSONALES:\n[Pill&Go] Probar el actor Carlos (alta)");
+  J.panel("Tu día", [
+    { t: "Calendario", tono: "info", items: [{ x: "Física 2210", sub: "JFB 102", tags: [["11:00", "info"]] }] },
+    { t: "Atrasado", tono: "crit", items: [{ x: "Quiz 4", sub: "Universidad", tags: [["ayer", "crit"]] }, { x: "Exam Review #1", sub: "Todoist", tags: [["hace 3 d", "crit"], ["alta", "warn"]] }] },
+    { t: "Hoy", tono: "warn", items: [{ x: "Writing: Implicit Bias Test", sub: "Universidad", tags: [["hoy", "warn"], ["alta", "warn"]] }, { x: "Probar el actor Carlos", sub: "Pill&Go", tags: [["alta", "warn"]] }] },
+    { t: "Próximos días", tono: "info", items: [{ x: "Homework 7 - Force and Motion", sub: "Universidad", tags: [["mañana", "info"]] }, { x: "Examen licencia Utah", sub: "Trámites", tags: [["vie 9", "info"], ["alta", "warn"]] }] },
+  ]);
+  J.pedirTexto("Pega tu token de API de Todoist", "todoist_token");
   $("player").hidden = false; $("pista-t").textContent = "lofi hip hop radio – beats to study"; $("pista-c").textContent = "Lofi Girl";
   const ciclo = ["escuchando", "pensando", "hablando", "dormido"];
   let i = 0;

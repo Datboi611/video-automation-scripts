@@ -76,6 +76,11 @@ SPECS = [
     ("pendiente_agregar", "Agrega un pendiente personal.",
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
+    ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key"),
+      "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
+    ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
+     {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
     ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
      {"motivo": (S, "Qué necesitas que escriba")}),
     ("correo", "Lee correos (personal y de la universidad): no leídos o buscando un texto.",
@@ -132,7 +137,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -157,6 +162,13 @@ CATEGORIAS = {
     "memoria": (r"olvida|memoria|voz|habla m[aá]s|habilidad|aprende|forget|voice",
                 {"olvidar_dato", "cambiar_voz", "usar_habilidad", "crear_habilidad"}),
 }
+
+
+def _prop(tipo, desc):
+    if tipo == "array":
+        return {"type": "array", "description": desc, "items": {"type": "object", "properties": {
+            "titulo": {"type": "string"}, "puntos": {"type": "array", "items": {"type": "string"}}}}}
+    return {"type": tipo, "description": desc}
 
 
 def herramientas_para(texto, extra=()):
@@ -189,7 +201,7 @@ class Herramientas:
             out.append({"type": "function", "function": {
                 "name": nombre, "description": desc,
                 "parameters": {"type": "object",
-                               "properties": {k: {"type": t, "description": d} for k, (t, d) in props.items()},
+                               "properties": {k: _prop(t, d) for k, (t, d) in props.items()},
                                "required": req}}})
         return out
 
@@ -450,7 +462,10 @@ class Herramientas:
                            ("PENDIENTES PERSONALES", lambda: pen.texto(solo_urgentes=dias <= 2)),
                            ("RECORDATORIOS", self.listar_recordatorios)):
             try:
-                partes.append(f"{titulo}:\n{fn()}")
+                r = fn()
+                if "no está conectado" in r or "sin correo conectado" in r:
+                    continue
+                partes.append(f"{titulo}:\n{r}")
             except Exception as e:
                 partes.append(f"{titulo}: error ({e})")
         return "\n\n".join(partes)
@@ -462,14 +477,20 @@ class Herramientas:
         from .integraciones import Calendario
         return Calendario.agregar(titulo, _fecha(fecha_hora), int(duracion_min))
 
+    def _sin_todoist(self):
+        if not self.agenda["todoist"].token:
+            self.pedir_dato("todoist_token")
+            return "Todoist no está conectado: abrí la barra para que pegue su token. Díselo brevemente."
+        return None
+
     def todoist(self, filtro="today | overdue"):
-        return self.agenda["todoist"].texto(filtro)
+        return self._sin_todoist() or self.agenda["todoist"].texto(filtro)
 
     def todoist_agregar(self, contenido, fecha=None):
-        return self.agenda["todoist"].agregar(contenido, fecha)
+        return self._sin_todoist() or self.agenda["todoist"].agregar(contenido, fecha)
 
     def todoist_completar(self, texto):
-        return self.agenda["todoist"].completar(texto)
+        return self._sin_todoist() or self.agenda["todoist"].completar(texto)
 
     def pendientes(self, proyecto=None, solo_urgentes=False):
         return self.agenda["pendientes"].texto(proyecto, solo_urgentes)
@@ -606,6 +627,33 @@ class Herramientas:
 
     def leer_pagina(self, url):
         return _texto_pagina(url, 5000)
+
+
+    # ---------- Configuración desde la barra y paneles ----------
+    def pedir_dato(self, campo, motivo=None):
+        textos = {"todoist_token": "Pega tu token de API de Todoist",
+                  "google_calendar_ics": "Pega la dirección secreta iCal de Google Calendar",
+                  "gemini_api_key": "Pega tu clave de Gemini (aistudio.google.com/apikey)",
+                  "claude_api_key": "Pega tu clave de API de Claude (console.anthropic.com)",
+                  "groq_api_key": "Pega tu clave de Groq"}
+        if campo not in textos:
+            return f"Campo no válido. Opciones: {', '.join(textos)}."
+        if getattr(self, "ui", None):
+            self.ui("pedirTexto", motivo or textos[campo], campo)
+        return "Barra abierta: el usuario lo escribirá y se guardará automáticamente. Díselo en una frase."
+
+    def mostrar_panel(self, titulo, secciones):
+        sec = []
+        for s in secciones or []:
+            if isinstance(s, dict):
+                puntos = s.get("puntos") or s.get("items") or []
+                sec.append({"t": s.get("titulo", ""), "tono": "info",
+                            "items": [{"x": str(p), "sub": "", "tags": []} for p in puntos]})
+            else:
+                sec.append({"t": "", "tono": "info", "items": [{"x": str(s), "sub": "", "tags": []}]})
+        if getattr(self, "ui", None):
+            self.ui("panel", titulo, sec)
+        return "Mostrado en el panel."
 
 
 def _texto_pagina(url, limite):

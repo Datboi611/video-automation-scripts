@@ -18,6 +18,7 @@ from core.herramientas import Herramientas
 from core.correo import Correo
 from core.integraciones import Calendario, Pendientes, Todoist
 from core.musica import Musica
+from core import paneles
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -193,14 +194,49 @@ class Jarvis:
             self.estado("reposo")
 
     def mostrar_resultado(self, nombre, args, resultado):
-        if nombre in PANEL:
-            self.ui("panel", PANEL[nombre], resultado)
-        elif nombre in ("crear_recordatorio", "borrar_recordatorio"):
-            self.ui("panel", "Recordatorios", self.herramientas.listar_recordatorios())
-        elif nombre in ("todoist_agregar", "todoist_completar"):
-            self.ui("panel", "Todoist", self.herramientas.todoist())
-        elif nombre in ("pendiente_agregar", "marcar_hecho"):
-            self.ui("panel", "Pendientes", self.herramientas.pendientes())
+        h = self.herramientas
+        try:
+            if nombre in ("resumen_del_dia", "todoist", "calendario", "listar_recordatorios", "crear_recordatorio",
+                          "borrar_recordatorio", "todoist_agregar", "marcar_hecho", "pendiente_agregar"):
+                self.ui("panel", "Tu día", paneles.agenda(h, int(args.get("dias", 1) or 1)))
+            elif nombre == "pendientes":
+                self.ui("panel", "Pendientes por proyecto", paneles.por_proyecto(h, args.get("proyecto")))
+            elif nombre in PANEL:
+                self.ui("panel", PANEL[nombre], paneles.desde_texto(resultado))
+        except Exception:
+            log.exception("No pude armar el panel")
+
+    def guardar_campo(self, campo, valor):
+        """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
+        valor = valor.strip()
+        c = self.cfg
+        if campo in ("todoist_token", "google_calendar_ics"):
+            c["agenda"][campo] = valor
+            config.guardar_valor(["agenda", campo], valor)
+            if campo == "todoist_token":
+                self.herramientas.agenda["todoist"].token = valor
+                try:
+                    self.herramientas.agenda["todoist"].tareas("today")
+                    msg = f"Todoist conectado, {c['tratamiento']}. Sus tareas ya no tienen dónde esconderse."
+                except Exception:
+                    msg = "Guardé el token, pero Todoist lo rechazó. Revise que esté completo."
+            else:
+                self.herramientas.agenda["calendario"].url = valor
+                msg = f"Calendario conectado, {c['tratamiento']}."
+        elif campo.endswith("_api_key"):
+            prov = campo.replace("_api_key", "")
+            lista = c["llm"]["proveedores"]
+            p = next((x for x in lista if x["nombre"] == prov), None)
+            if not p:
+                p = {"nombre": prov, "modelo": config.MODELO_INICIAL.get(prov, "")}
+                lista.insert(0 if prov == "claude" else len(lista), p)
+            p["api_key"] = valor
+            config.guardar_valor(["llm", "proveedores"], lista)
+            self.cerebro = Cerebro(c, self.herramientas, self.memoria, self.habilidades)
+            msg = f"Clave de {prov.capitalize()} guardada y activa, {c['tratamiento']}."
+        else:
+            return
+        self.decir(msg)
 
     # ---------- Flujo principal ----------
     def decir(self, texto, idioma="es"):
@@ -251,6 +287,8 @@ class Jarvis:
     def comando_de_voz(self, audio):
         self.estado("pensando")
         texto, idioma = self.oido.transcribir(audio)
+        if self.cfg.get("idioma", "es") == "es":
+            idioma = "es"
         if not texto:
             self.estado("escuchando")
             return False
@@ -312,8 +350,12 @@ class Api:
     def __init__(self, jarvis):
         self._j = jarvis
 
-    def enviar(self, texto):
-        if texto.strip():
+    def enviar(self, texto, campo=None):
+        if not texto.strip():
+            return
+        if campo:
+            threading.Thread(target=self._j.guardar_campo, args=(campo, texto), daemon=True).start()
+        else:
             threading.Thread(target=self._j.procesar, args=(texto.strip(),), daemon=True).start()
 
     def activar(self):

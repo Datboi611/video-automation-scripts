@@ -71,5 +71,7 @@
   "segundos_silencio": 1.6,
   "_ayuda_correo": "Usa una 'contraseña de aplicación': Gmail (myaccount.google.com/apppasswords) o iCloud (appleid.apple.com). Correo de universidad Outlook: reenvíalo a tu Gmail.",
   "interrumpir": true,
-  "vocabulario": ""
+  "vocabulario": "",
+  "idioma": "es",
+  "_ayuda_idioma": "es = siempre español; auto = español o inglés según cómo hables"
 }

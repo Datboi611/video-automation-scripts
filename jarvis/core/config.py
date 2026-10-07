@@ -35,6 +35,7 @@ DEFAULTS = {
         "telegram_usuario": "",
         "control_remoto": False,
     },
+    "idioma": "es",  # "es" = siempre español; "auto" = español o inglés según cómo hables
     "minutos_reposo": 30,
     "segundos_silencio": 1.6,
     "interrumpir": True,
@@ -44,12 +45,15 @@ DEFAULTS = {
 }
 
 URLS_PROVEEDOR = {
+    "claude": "https://api.anthropic.com/v1/",
     "groq": "https://api.groq.com/openai/v1",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "ollama": "http://localhost:11434/v1",
 }
 
-ENV_KEYS = {"groq": "GROQ_API_KEY", "gemini": "GEMINI_API_KEY"}
+ENV_KEYS = {"groq": "GROQ_API_KEY", "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
+
+MODELO_INICIAL = {"claude": "claude-sonnet-5-5", "gemini": "gemini-2.5-flash", "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
 
 # Modelos de respaldo dentro del mismo proveedor (si uno falla o se retira, prueba el siguiente)
 RESPALDO_MODELOS = {
