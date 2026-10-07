@@ -157,6 +157,22 @@ class Jarvis:
             log.warning("No pude responder al teléfono: %s", e)
 
 
+ICONO = os.path.join(config.BASE, "ui", "jarvis.ico")
+
+
+def poner_icono(ventana):
+    """Icono propio en la ventana y la barra de tareas de Windows (en vez del de Python)."""
+    if sys.platform != "win32":
+        return
+    try:
+        from System import Action
+        from System.Drawing import Icon
+        form = ventana.native
+        form.Invoke(Action(lambda: setattr(form, "Icon", Icon(ICONO))))
+    except Exception as e:
+        log.warning("No pude poner el icono: %s", e)
+
+
 class Api:
     """Funciones que la interfaz (JavaScript) puede llamar."""
 
@@ -183,6 +199,12 @@ class Api:
 
 
 def main():
+    if sys.platform == "win32":
+        try:  # que Windows agrupe la ventana como "JARVIS" y no como Python
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Jarvis.Asistente")
+        except Exception:
+            pass
     jarvis = Jarvis()
     ui = os.path.join(config.BASE, "ui", "index.html")
     jarvis.ventana = webview.create_window(
@@ -190,7 +212,8 @@ def main():
         min_size=(760, 560), background_color="#01040c",
     )
     jarvis.ventana.events.loaded += jarvis.listo.set
-    webview.start(jarvis.iniciar)
+    jarvis.ventana.events.shown += lambda: poner_icono(jarvis.ventana)
+    webview.start(jarvis.iniciar, icon=ICONO)
 
 
 if __name__ == "__main__":

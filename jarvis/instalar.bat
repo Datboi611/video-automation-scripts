@@ -21,6 +21,7 @@ if not exist modelos\vosk-model-small-en-us-0.15 (
   powershell -NoProfile -Command "Invoke-WebRequest https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -OutFile modelos\vosk.zip; Expand-Archive modelos\vosk.zip -DestinationPath modelos -Force; Remove-Item modelos\vosk.zip"
 )
 if not exist config.json copy config.example.json config.json >nul
+call crear_acceso_directo.bat
 echo.
 echo   Listo. 1) Abre config.json y pega tu clave gratis de Groq.  2) Ejecuta iniciar.bat
 echo.
