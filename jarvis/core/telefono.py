@@ -68,8 +68,8 @@ class Telefono:
         # Las cuentas de prueba no aceptan el parámetro Twiml: se entrega el guion por URL (Twimlets echo,
         # servicio de Twilio). Si eso fallara, se prueba el Twiml directo (cuentas de pago).
         intentos = [
+            {**base, "Twiml": twiml},  # cuenta de pago: JARVIS habla con su voz
             {**base, "Url": "https://twimlets.com/echo?" + urllib.parse.urlencode({"Twiml": twiml}), "Method": "GET"},
-            {**base, "Twiml": twiml},
             {**base, "Url": "https://twimlets.com/message?" + urllib.parse.urlencode({"Message[0]": mensaje[:500]}),
              "Method": "GET"},
         ]
