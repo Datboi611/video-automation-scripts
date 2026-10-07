@@ -193,6 +193,7 @@ class Jarvis:
 
         # JARVIS en el iPhone (bot de Telegram) y vigilante de la agenda
         self.bot = BotTelegram(c, self, lambda k, v: config.guardar_valor(["telegram_bot", k], v))
+        self.herramientas.bot = self.bot
         self.iniciar_bot()
         self.vigilante = Vigilante(c, self, os.path.join(config.DATOS, "avisos.json"))
         self.vigilante.iniciar()

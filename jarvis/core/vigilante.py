@@ -168,6 +168,8 @@ class Vigilante:
                 except Exception as e:
                     log.warning("No pude llamar: %s", e)
                 self._avisar("📞 " + msg, urgente=True, voz=msg)
+                if self.j.bot:  # en iPhone la llamada suena sin audio: va también como nota de voz
+                    self.j.bot.enviar_voz(msg)
 
     def _revisar_correo(self, trat):
         correo = self.j.herramientas.agenda.get("correo")

@@ -3,6 +3,7 @@
 - /pantalla: captura de lo que pasa en el PC.  /hoy: agenda.  /estado: estado del PC.
 Solo obedece al chat vinculado con el código de emparejamiento."""
 import io
+import os
 import logging
 import random
 import threading
@@ -52,9 +53,42 @@ class BotTelegram:
                       files={"audio": ("jarvis.mp3", f, "audio/mpeg")}, timeout=60)
 
     # ---------- arranque ----------
+    def configurar(self):
+        """Deja el bot listo: nombre, descripción y menú de comandos."""
+        try:
+            self._api("setMyCommands", json={"commands": [
+                {"command": "hoy", "description": "Mi agenda de hoy"},
+                {"command": "pantalla", "description": "Ver la pantalla del PC"},
+                {"command": "estado", "description": "Estado del PC y procesos"},
+                {"command": "canvas", "description": "Novedades de Canvas"},
+                {"command": "correo", "description": "Correos importantes"},
+                {"command": "musica", "description": "Pausar o reanudar la música"},
+            ]})
+            self._api("setMyDescription", data={"description":
+                      "J.A.R.V.I.S. — el asistente personal de Diego. Escríbeme o mándame notas de voz: "
+                      "controlo su PC, su agenda, Canvas, correo y le aviso lo importante."})
+            self._api("setMyShortDescription", data={"short_description": "Asistente personal estilo Stark."})
+            self._api("setMyName", data={"name": "J.A.R.V.I.S."})
+        except Exception as e:
+            log.warning("No pude configurar el bot: %s", e)
+
+    def enviar_voz(self, texto):
+        """Nota de voz con la voz de JARVIS (sirve cuando la llamada de iPhone llega sin audio)."""
+        if not (self.activo and self.cfg.get("chat_id")):
+            return
+        try:
+            ruta = self.j.voz.archivo(texto)
+            with open(ruta, "rb") as f:
+                self._api("sendAudio", data={"chat_id": self.cfg["chat_id"], "title": "JARVIS", "performer": "JARVIS"},
+                          files={"audio": ("aviso.mp3", f, "audio/mpeg")}, timeout=60)
+            os.remove(ruta)
+        except Exception as e:
+            log.warning("Nota de voz: %s", e)
+
     def iniciar(self):
         if not self.activo or (self._hilo and self._hilo.is_alive()):
             return
+        threading.Thread(target=self.configurar, daemon=True).start()
         if not self.cfg.get("chat_id"):
             self.codigo = f"{random.randint(0, 999999):06d}"
         self._hilo = threading.Thread(target=self._loop, daemon=True)
@@ -102,6 +136,12 @@ class BotTelegram:
                 texto = "¿Qué tengo hoy?"
             elif texto.startswith("/estado"):
                 texto = "Dame el estado del PC y qué procesos estás haciendo."
+            elif texto.startswith("/canvas"):
+                texto = "¿Qué novedades y pendientes tengo en Canvas?"
+            elif texto.startswith("/correo"):
+                texto = "¿Tengo correos importantes sin leer?"
+            elif texto.startswith("/musica"):
+                texto = "Pausa la música" if getattr(getattr(self.j.herramientas, "musica", None), "sonando", False) else "Reanuda la música"
             elif texto.startswith("/start"):
                 return self.enviar("A sus órdenes, jefe.")
             if m.get("voice") or m.get("audio"):

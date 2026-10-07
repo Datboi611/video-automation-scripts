@@ -38,10 +38,13 @@ class Telefono:
             return "No hay usuario de Telegram configurado (telefono.telegram_usuario)."
         r = requests.get(
             "https://api.callmebot.com/start.php",
-            params={"user": self.telegram, "text": mensaje, "lang": "es-ES-Standard-B", "rpt": 2},
+            # cc=yes: copia en texto (en iPhone la llamada suena pero Telegram no reproduce el audio)
+            params={"user": self.telegram, "text": mensaje[:250], "lang": "es-ES-Standard-B", "rpt": 2, "cc": "yes"},
             timeout=40,
         )
         r.raise_for_status()
+        if "not authorized" in r.text.lower() or "error" in r.text.lower()[:200]:
+            return "CallMeBot no pudo llamar: abre @CallMeBot_txtbot en Telegram y pulsa Iniciar."
         return "Llamada iniciada por Telegram."
 
     def mensaje_telegram(self, mensaje):

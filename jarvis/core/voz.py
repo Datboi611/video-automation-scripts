@@ -77,6 +77,16 @@ class Voz:
             self.hablando = False
             self.on_nivel(0)
 
+    def archivo(self, texto):
+        """Genera un mp3 con la voz de JARVIS (para notas de voz por Telegram)."""
+        texto = limpiar(texto)
+        if self.cfg["motor"] == "elevenlabs" and self.cfg.get("elevenlabs_api_key"):
+            try:
+                return self._generar_11(texto)
+            except Exception:
+                pass
+        return self._generar(texto, self.cfg["voz"])
+
     # ---------- edge-tts por frases ----------
     def _generar(self, texto, voz):
         import edge_tts

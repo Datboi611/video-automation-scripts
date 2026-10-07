@@ -454,7 +454,11 @@ class Herramientas:
         return self.telefono.notificar(mensaje)
 
     def llamar_telefono(self, mensaje):
-        return self.telefono.llamar(mensaje)
+        r = self.telefono.llamar(mensaje)
+        bot = getattr(self, "bot", None)
+        if bot:
+            bot.enviar_voz(mensaje)
+        return r
 
     def mensaje_telegram(self, mensaje):
         return self.telefono.mensaje_telegram(mensaje)
