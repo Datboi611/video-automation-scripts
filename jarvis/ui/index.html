@@ -28,13 +28,31 @@
     <div class="estado"><span id="estado">INICIANDO SISTEMAS</span><small id="hint">Cargando…</small></div>
   </main>
 
-  <section class="chat">
+  <aside class="lateral" id="lateral">
+    <div class="bloque">
+      <h4>PROCESOS</h4>
+      <ul id="procesos"><li class="vacio">Sin tareas en curso</li></ul>
+    </div>
+    <div id="paneles"></div>
+  </aside>
+
+  <div class="player" id="player" hidden>
+    <div class="eq"><i></i><i></i><i></i><i></i></div>
+    <div class="pista"><b id="pista-t">—</b><small id="pista-c"></small></div>
+    <button id="p-play" aria-label="Pausar">❚❚</button>
+    <button id="p-next" aria-label="Siguiente">⏭</button>
+    <button id="p-stop" aria-label="Detener">✕</button>
+    <audio id="audio" preload="auto"></audio>
+  </div>
+
+  <section class="chat" id="chat" hidden>
     <div id="log"></div>
     <form id="form" autocomplete="off">
-      <input id="entrada" placeholder="Escribe una orden… (o di «Jarvis»)">
+      <input id="entrada" placeholder="Escribe una orden…">
       <button aria-label="Enviar">➤</button>
     </form>
   </section>
+  <button class="toggle-chat" id="toggle-chat" title="Escribir a JARVIS">⌨</button>
 
   <script src="app.js"></script>
 </body>

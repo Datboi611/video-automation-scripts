@@ -40,6 +40,23 @@ Ejemplos:
 - «Cierra Chrome», «bloquea el PC», «haz una captura de pantalla»
 - «Recuerda que mi reunión de los lunes es a las 10»
 
+## Novedades v3
+
+- **Menú lateral**: muestra los procesos en curso (puede hacer varias tareas a la vez) y paneles con tu agenda, recordatorios, correo, clima…
+- **Agenda real**: Google Calendar (enlace iCal secreto), Todoist (token), tus pendientes personales y correos (contraseña de aplicación). Pregúntale «¿qué tengo hoy?».
+- **Ojos**: «¿qué ves en mi pantalla?», «explícame este error», aunque estés en otra ventana.
+- **Música en segundo plano** dentro de JARVIS (YouTube): «pon lo-fi para estudiar», «pausa», «siguiente».
+- **Investiga en internet** (DuckDuckGo, gratis) y encadena pasos para tareas complejas.
+- **Se programa habilidades nuevas** en Python cuando no sabe hacer algo, e instala lo que necesite.
+- **Memoria**: guarda tus preferencias e instrucciones («siempre…», «nunca…», «prefiero…»).
+- Chat oculto: botón ⌨ abajo a la derecha. Si hay un error, solo dice «hubo un error» (detalle en `datos/jarvis.log`).
+
+### Conectar tu agenda (config.json → "agenda" y "correo")
+- **Google Calendar**: calendar.google.com → ⚙ Configuración → tu calendario → «Dirección secreta en formato iCal» → pégala en `google_calendar_ics`.
+- **Todoist**: Configuración → Integraciones → Desarrollador → copia el token en `todoist_token`.
+- **Correo**: Gmail → myaccount.google.com/apppasswords · iCloud → appleid.apple.com → «Contraseñas de apps». Pon email y esa contraseña en `correo`. El correo de la universidad (Outlook) reenvíalo a tu Gmail.
+- **Recomendado**: clave gratis de **Gemini** (aistudio.google.com/apikey) como respaldo cuando Groq llegue a su límite por minuto.
+
 ## Conectar tu celular (gratis)
 
 **Notificaciones (ntfy):**

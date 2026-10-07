@@ -13,3 +13,8 @@ pyperclip
 pycaw
 comtypes
 faster-whisper
+icalendar
+recurring-ical-events
+yt-dlp
+ddgs
+beautifulsoup4

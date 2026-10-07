@@ -154,8 +154,9 @@ class Escucha:
         self.ultimo = 0
 
     def _grabar(self, espera_max):
-        """Graba una frase (termina tras 0.8 s de silencio). None si nadie habla."""
+        """Graba una frase (termina tras ~1.6 s de silencio, configurable). None si nadie habla."""
         frames, hablando, silencio, voz, inicio = [], False, 0, 0, time.time()
+        fin_silencio = int(self.cfg.get("segundos_silencio", 1.6) / 0.03)
         while True:
             self._manual.clear()
             frame = self._leer()
@@ -165,7 +166,8 @@ class Escucha:
                 continue
             x = frame.astype(np.float32) / 32768
             rms = float(np.sqrt(np.mean(x * x)))
-            umbral = max(self.ruido * 3.5, 0.012)
+            # al empezar a hablar exige más volumen; ya hablando, basta con voz suave (pausas, finales de frase)
+            umbral = max(self.ruido * (3.5 if not hablando else 2.2), 0.012 if not hablando else 0.008)
             self.on_nivel(min(1.0, rms * 12))
             if rms > umbral:
                 hablando, silencio, voz = True, 0, voz + 1
@@ -177,7 +179,7 @@ class Escucha:
                 frames.append(frame)
             else:
                 frames = frames[-10:] + [frame]  # conserva 300 ms previos
-            if hablando and silencio > 26:
+            if hablando and silencio > fin_silencio:
                 if voz < 8:  # ruido corto (golpe, tos): se ignora
                     frames, hablando, silencio, voz = [], False, 0, 0
                     continue

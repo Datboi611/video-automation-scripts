@@ -61,57 +61,128 @@ def _fecha(texto):
 
 
 S = "string"
+# (nombre, descripción, {parámetro: (tipo, descripción)}, [obligatorios])  — descripciones cortas = menos tokens
 SPECS = [
-    ("abrir_aplicacion", "Abre cualquier programa o app instalada en Windows (Chrome, Spotify, Word, WhatsApp, juegos, configuración...).",
-     {"nombre": (S, "Nombre de la aplicación")}),
-    ("cerrar_aplicacion", "Cierra un programa abierto.", {"nombre": (S, "Nombre del programa")}),
-    ("abrir_web", "Abre una página web o URL en el navegador.", {"url": (S, "URL o dominio")}),
-    ("buscar_en_internet", "Busca algo en Google o YouTube y lo abre en el navegador.",
-     {"consulta": (S, "Qué buscar"), "sitio": (S, "'google' o 'youtube'")}, ["consulta"]),
-    ("consultar_wikipedia", "Obtiene un resumen de Wikipedia en español para responder preguntas de conocimiento.",
-     {"tema": (S, "Tema a consultar")}),
-    ("clima", "Clima actual y pronóstico de hoy/mañana de una ciudad.", {"ciudad": (S, "Ciudad")}),
-    ("ejecutar_powershell", "Ejecuta un comando de PowerShell en el PC y devuelve la salida. Úsalo para cualquier tarea del sistema que no tenga herramienta propia (archivos, carpetas, red, procesos, wifi, etc.).",
-     {"comando": (S, "Comando de PowerShell")}),
-    ("controlar_volumen", "Sube, baja, silencia o fija el volumen del PC.",
-     {"accion": (S, "'subir', 'bajar', 'silenciar', 'fijar'"), "nivel": ("integer", "0-100 si accion es 'fijar'")}, ["accion"]),
-    ("controlar_multimedia", "Controla la música/vídeo que suena.",
-     {"accion": (S, "'pausar', 'siguiente', 'anterior'")}),
-    ("escribir_texto", "Escribe (pega) texto en la ventana activa, como si el usuario lo tecleara.",
-     {"texto": (S, "Texto a escribir")}),
-    ("presionar_teclas", "Pulsa una tecla o combinación, p. ej. 'ctrl+c', 'alt+tab', 'win+d', 'enter'.",
-     {"teclas": (S, "Teclas separadas por +")}),
-    ("captura_pantalla", "Hace una captura de pantalla y la guarda en Imágenes.", {}),
-    ("info_sistema", "Estado del PC: CPU, RAM, batería, disco y programas que más consumen.", {}),
-    ("buscar_archivos", "Busca archivos por nombre en la carpeta del usuario.",
-     {"nombre": (S, "Parte del nombre del archivo"), "carpeta": (S, "Carpeta opcional")}, ["nombre"]),
-    ("abrir_archivo", "Abre un archivo o carpeta con su programa predeterminado.", {"ruta": (S, "Ruta completa")}),
-    ("leer_archivo", "Lee el contenido de texto de un archivo.", {"ruta": (S, "Ruta completa")}),
-    ("energia", "Bloquear, suspender, apagar, reiniciar el PC o cancelar un apagado. Pide confirmación antes de apagar/reiniciar.",
-     {"accion": (S, "'bloquear', 'suspender', 'apagar', 'reiniciar', 'cancelar'")}),
-    ("crear_recordatorio", "Crea un recordatorio/alarma. Avisa en el PC, envía notificación al teléfono y, si se pide, llama por teléfono.",
-     {"mensaje": (S, "Qué recordar"), "en_minutos": ("number", "Dentro de cuántos minutos"),
-      "fecha_hora": (S, "'YYYY-MM-DD HH:MM' o 'HH:MM'"), "llamar": ("boolean", "Llamar al teléfono al vencer"),
-      "repetir_diario": ("boolean", "Repetir cada día")}, ["mensaje"]),
-    ("listar_recordatorios", "Lista los recordatorios pendientes.", {}),
-    ("borrar_recordatorio", "Borra recordatorios por id o texto.", {"texto": (S, "Id o parte del mensaje")}),
-    ("recordar_dato", "Guarda en memoria permanente un dato sobre el usuario o una preferencia.", {"dato": (S, "Dato a recordar")}),
-    ("olvidar_dato", "Borra datos de la memoria permanente.", {"texto": (S, "Texto del dato a olvidar")}),
-    ("notificar_telefono", "Envía una notificación push al teléfono del usuario.", {"mensaje": (S, "Mensaje")}),
-    ("llamar_telefono", "Llama al teléfono del usuario (Telegram) y le dice un mensaje por voz.", {"mensaje": (S, "Mensaje")}),
-    ("mensaje_telegram", "Envía un mensaje de texto al Telegram del usuario.", {"mensaje": (S, "Mensaje")}),
+    ("resumen_del_dia", "Agenda completa: eventos de Google Calendar, tareas de Todoist, pendientes personales y recordatorios. Úsalo para '¿qué tengo hoy?', '¿qué deberes/pendientes tengo?'.",
+     {"dias": ("integer", "Días a incluir (1=hoy, 7=semana)")}, []),
+    ("calendario", "Eventos de Google Calendar de los próximos días.", {"dias": ("integer", "Días")}, []),
+    ("agregar_evento", "Agenda un evento en Google Calendar.",
+     {"titulo": (S, "Título"), "fecha_hora": (S, "'YYYY-MM-DD HH:MM'"), "duracion_min": ("integer", "Minutos")}, ["titulo", "fecha_hora"]),
+    ("todoist", "Tareas de Todoist. filtro de Todoist p. ej. 'today | overdue', '7 days', '#Universidad'.", {"filtro": (S, "Filtro")}, []),
+    ("todoist_agregar", "Crea una tarea en Todoist.", {"contenido": (S, "Tarea"), "fecha": (S, "Fecha en lenguaje natural, p. ej. 'mañana 5pm'")}, ["contenido"]),
+    ("todoist_completar", "Marca como hecha una tarea de Todoist.", {"texto": (S, "Parte del nombre")}),
+    ("pendientes", "Pendientes personales por proyecto (Pill&Go, Ezma, Universidad, Trámites, Carrera, Startups, Finanzas).",
+     {"proyecto": (S, "Proyecto opcional"), "solo_urgentes": ("boolean", "Solo vencidos/próximos/alta prioridad")}, []),
+    ("pendiente_agregar", "Agrega un pendiente personal.",
+     {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
+    ("pendiente_completar", "Marca un pendiente personal como hecho.", {"texto": (S, "Parte del texto")}),
+    ("correo", "Lee correos (personal y de la universidad): no leídos o buscando un texto.",
+     {"cuenta": (S, "personal/universidad, opcional"), "buscar": (S, "Texto a buscar, opcional"),
+      "solo_no_leidos": ("boolean", "Solo no leídos (por defecto sí)")}, []),
+    ("enviar_correo", "Envía un correo. Confirma destinatario y texto con el usuario antes.",
+     {"para": (S, "Email destino"), "asunto": (S, "Asunto"), "cuerpo": (S, "Texto"), "cuenta": (S, "personal/universidad")},
+     ["para", "asunto", "cuerpo"]),
+    ("abrir_aplicacion", "Abre un programa o app de Windows.", {"nombre": (S, "Nombre")}),
+    ("cerrar_aplicacion", "Cierra un programa.", {"nombre": (S, "Nombre")}),
+    ("abrir_web", "Abre una URL.", {"url": (S, "URL")}),
+    ("buscar_en_internet", "Busca en Google o YouTube y lo abre.", {"consulta": (S, "Qué buscar"), "sitio": (S, "google/youtube")}, ["consulta"]),
+    ("investigar_web", "Busca en internet y lee las mejores páginas para investigar algo (noticias, precios, cómo hacer algo, datos actuales). Puedes encadenar varias búsquedas.",
+     {"consulta": (S, "Qué investigar"), "paginas": ("integer", "Páginas a leer (1-4)")}, ["consulta"]),
+    ("leer_pagina", "Lee el texto de una página web.", {"url": (S, "URL")}),
+    ("consultar_wikipedia", "Resumen de Wikipedia (español).", {"tema": (S, "Tema")}),
+    ("clima", "Clima actual y pronóstico.", {"ciudad": (S, "Ciudad")}),
+    ("ver_pantalla", "Tus OJOS: mira la pantalla (aunque el usuario esté en otra ventana). Úsalo cuando diga 'esto', 'lo que estoy viendo', 'mi pantalla', 'este error', etc.", {"pregunta": (S, "Qué mirar")}),
+    ("preguntar_a_claude", "Abre Claude (claude.ai) con una pregunta compleja del usuario.", {"pregunta": (S, "Pregunta")}),
+    ("ejecutar_powershell", "Ejecuta PowerShell. Para cualquier tarea del sistema sin herramienta propia.", {"comando": (S, "Comando")}),
+    ("ejecutar_python", "Ejecuta código Python y devuelve lo impreso.", {"codigo": (S, "Código")}),
+    ("controlar_volumen", "Volumen del PC.", {"accion": (S, "subir/bajar/silenciar/fijar"), "nivel": ("integer", "0-100")}, ["accion"]),
+    ("poner_musica", "Pone música de YouTube en segundo plano dentro de JARVIS (sin abrir ventanas). varias=true para una mezcla/cola.",
+     {"busqueda": (S, "Canción, artista o género"), "varias": ("boolean", "Varias canciones")}, ["busqueda"]),
+    ("controlar_musica", "Controla la música de JARVIS.", {"accion": (S, "pausar/reanudar/siguiente/detener/volumen"), "nivel": ("integer", "Volumen 0-100")}, ["accion"]),
+    ("apple_music", "Busca en Apple Music (se abre aparte).", {"busqueda": (S, "Qué buscar")}),
+    ("controlar_multimedia", "Teclas multimedia de Windows (Spotify, Apple Music…).", {"accion": (S, "pausar/siguiente/anterior")}),
+    ("escribir_texto", "Escribe texto en la ventana activa.", {"texto": (S, "Texto")}),
+    ("presionar_teclas", "Pulsa teclas, p. ej. 'ctrl+c', 'win+d'.", {"teclas": (S, "Teclas con +")}),
+    ("captura_pantalla", "Guarda una captura en Imágenes.", {}),
+    ("info_sistema", "CPU, RAM, batería, disco.", {}),
+    ("buscar_archivos", "Busca archivos por nombre.", {"nombre": (S, "Nombre"), "carpeta": (S, "Carpeta")}, ["nombre"]),
+    ("listar_carpeta", "Lista el contenido de una carpeta.", {"ruta": (S, "Ruta")}),
+    ("abrir_archivo", "Abre un archivo o carpeta.", {"ruta": (S, "Ruta")}),
+    ("leer_archivo", "Lee un archivo de texto.", {"ruta": (S, "Ruta")}),
+    ("escribir_archivo", "Crea o sobrescribe un archivo de texto.", {"ruta": (S, "Ruta"), "contenido": (S, "Contenido")}),
+    ("energia", "bloquear/suspender/apagar/reiniciar/cancelar. Confirma antes de apagar.", {"accion": (S, "Acción")}),
+    ("crear_recordatorio", "Recordatorio/alarma: avisa en PC y teléfono; puede llamar.",
+     {"mensaje": (S, "Qué"), "en_minutos": ("number", "Minutos"), "fecha_hora": (S, "'YYYY-MM-DD HH:MM' o 'HH:MM'"),
+      "llamar": ("boolean", "Llamar al vencer"), "repetir_diario": ("boolean", "Diario")}, ["mensaje"]),
+    ("listar_recordatorios", "Recordatorios pendientes.", {}),
+    ("borrar_recordatorio", "Borra recordatorios.", {"texto": (S, "Id o texto")}),
+    ("recordar_dato", "Guarda un dato duradero del usuario.", {"dato": (S, "Dato")}),
+    ("olvidar_dato", "Borra un dato de memoria.", {"texto": (S, "Texto")}),
+    ("notificar_telefono", "Notificación push al teléfono.", {"mensaje": (S, "Mensaje")}),
+    ("llamar_telefono", "Llama al teléfono (Telegram) con un mensaje.", {"mensaje": (S, "Mensaje")}),
+    ("mensaje_telegram", "Mensaje de Telegram al usuario.", {"mensaje": (S, "Mensaje")}),
+    ("crear_habilidad", "Programa e instala una habilidad nueva en Python cuando no tengas herramienta para algo. El código define ejecutar(**kwargs) -> str.",
+     {"nombre": (S, "nombre_corto"), "descripcion": (S, "Qué hace y qué argumentos recibe"), "codigo": (S, "Código Python completo")}),
+    ("usar_habilidad", "Ejecuta una habilidad instalada.", {"nombre": (S, "Nombre"), "argumentos": ("object", "Argumentos")}, ["nombre"]),
+    ("instalar_paquete", "Instala un paquete de Python (pip) que necesite una habilidad.", {"paquete": (S, "Paquete")}),
+    ("cambiar_voz", "Cambia la voz de JARVIS.", {"voz": (S, "Voz de edge-tts, p. ej. es-MX-JorgeNeural, en-US-AndrewMultilingualNeural"), "idioma": (S, "es/en")}, ["voz"]),
 ]
 
 
-class Herramientas:
-    def __init__(self, memoria, recordatorios, telefono):
-        self.memoria, self.recordatorios, self.telefono = memoria, recordatorios, telefono
-        self._apps = None
+# Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
+NUCLEO = {"ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+          "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
+CATEGORIAS = {
+    "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
+               r"cita|reuni|examen|quiz|homework|schedule|task|remind|plan|organiza|proyecto|hecho|termin|complet",
+               {"resumen_del_dia", "calendario", "agregar_evento", "todoist", "todoist_agregar", "todoist_completar",
+                "pendientes", "pendiente_agregar", "pendiente_completar", "crear_recordatorio", "listar_recordatorios",
+                "borrar_recordatorio"}),
+    "correo": (r"correo|mail|inbox|bandeja|mensaje de|escrib.* a |responde", {"correo", "enviar_correo"}),
+    "musica": (r"m[uú]sica|canci|pon |reproduc|playlist|youtube|apple|spotify|pausa|reanuda|volumen|sube|baja|"
+               r"siguiente|anterior|play|song|music|det[eé]n|calla|silencio",
+               {"poner_musica", "controlar_musica", "apple_music", "controlar_multimedia", "controlar_volumen"}),
+    "pc": (r"abre|cierra|archivo|carpeta|documento|powershell|ejecuta|pantalla|captura|tecla|escribe|copia|pega|apaga|"
+           r"bloquea|reinicia|suspende|sistema|bater|ram|cpu|disco|instala|programa|app|ventana|descarga|open|close|file",
+           {"cerrar_aplicacion", "escribir_texto", "presionar_teclas", "captura_pantalla", "info_sistema",
+            "buscar_archivos", "listar_carpeta", "abrir_archivo", "leer_archivo", "escribir_archivo", "energia",
+            "instalar_paquete", "controlar_volumen"}),
+    "web": (r"busca|investiga|internet|web|google|wikipedia|qu[ié]n es|qu[eé] es|clima|tiempo|noticia|precio|p[aá]gina|"
+            r"search|research|weather|news|claude|link|url",
+            {"leer_pagina", "consultar_wikipedia", "clima", "abrir_web", "buscar_en_internet", "preguntar_a_claude"}),
+    "telefono": (r"tel[eé]fono|celular|llam|notifica|telegram|avísame|avisame|phone|call",
+                 {"notificar_telefono", "llamar_telefono", "mensaje_telegram"}),
+    "memoria": (r"olvida|memoria|voz|habla m[aá]s|habilidad|aprende|forget|voice",
+                {"olvidar_dato", "cambiar_voz", "usar_habilidad", "crear_habilidad"}),
+}
 
-    def esquemas(self):
+
+def herramientas_para(texto, extra=()):
+    t = texto.lower()
+    nombres = set(NUCLEO) | set(extra)
+    for patron, grupo in CATEGORIAS.values():
+        if re.search(patron, t):
+            nombres |= grupo
+    return nombres
+
+
+class Herramientas:
+    def __init__(self, memoria, recordatorios, telefono, cfg=None, agenda=None, habilidades=None, voz=None):
+        self.memoria, self.recordatorios, self.telefono = memoria, recordatorios, telefono
+        self.cfg = cfg or {}
+        self.agenda = agenda or {}
+        self.habilidades = habilidades
+        self.voz = voz
+        self._apps = None
+        self.on_resultado = lambda nombre, args, resultado: None
+        self.musica = None
+
+    def esquemas(self, solo=None):
         out = []
         for spec in SPECS:
             nombre, desc, props = spec[:3]
+            if solo is not None and nombre not in solo:
+                continue
             req = spec[3] if len(spec) > 3 else list(props)
             out.append({"type": "function", "function": {
                 "name": nombre, "description": desc,
@@ -124,8 +195,14 @@ class Herramientas:
         fn = getattr(self, nombre, None)
         if not fn or nombre.startswith("_") or nombre not in {s[0] for s in SPECS}:
             return f"Herramienta desconocida: {nombre}"
+        args = {k: v for k, v in (args or {}).items() if v is not None}
         try:
-            return str(fn(**args))[:4000]
+            resultado = str(fn(**args))[:7000]
+            try:
+                self.on_resultado(nombre, args, resultado)
+            except Exception:
+                pass
+            return resultado
         except Exception as e:
             log.exception("Error en herramienta %s", nombre)
             return f"Error: {e}"
@@ -358,3 +435,163 @@ class Herramientas:
 
     def mensaje_telegram(self, mensaje):
         return self.telefono.mensaje_telegram(mensaje)
+
+    # ---------- Agenda ----------
+    def resumen_del_dia(self, dias=1):
+        dias = max(1, int(dias))
+        partes = []
+        cal, tod, pen = self.agenda.get("calendario"), self.agenda.get("todoist"), self.agenda.get("pendientes")
+        for titulo, fn in (("CALENDARIO", lambda: cal.texto(dias)),
+                           ("CORREOS NO LEÍDOS", lambda: self.agenda["correo"].resumen(maximo=4)
+                            if self.agenda.get("correo") and self.agenda["correo"]._elegir() else "(sin correo conectado)"),
+                           ("TODOIST", lambda: tod.texto("overdue | today" if dias == 1 else f"overdue | {dias} days")),
+                           ("PENDIENTES PERSONALES", lambda: pen.texto(solo_urgentes=dias <= 2)),
+                           ("RECORDATORIOS", self.listar_recordatorios)):
+            try:
+                partes.append(f"{titulo}:\n{fn()}")
+            except Exception as e:
+                partes.append(f"{titulo}: error ({e})")
+        return "\n\n".join(partes)
+
+    def calendario(self, dias=1):
+        return self.agenda["calendario"].texto(max(1, int(dias)))
+
+    def agregar_evento(self, titulo, fecha_hora, duracion_min=60):
+        from .integraciones import Calendario
+        return Calendario.agregar(titulo, _fecha(fecha_hora), int(duracion_min))
+
+    def todoist(self, filtro="today | overdue"):
+        return self.agenda["todoist"].texto(filtro)
+
+    def todoist_agregar(self, contenido, fecha=None):
+        return self.agenda["todoist"].agregar(contenido, fecha)
+
+    def todoist_completar(self, texto):
+        return self.agenda["todoist"].completar(texto)
+
+    def pendientes(self, proyecto=None, solo_urgentes=False):
+        return self.agenda["pendientes"].texto(proyecto, solo_urgentes)
+
+    def pendiente_agregar(self, texto, proyecto="General", fecha=None, prioridad="media"):
+        return self.agenda["pendientes"].agregar(texto, proyecto, fecha, prioridad)
+
+    def pendiente_completar(self, texto):
+        return self.agenda["pendientes"].completar(texto)
+
+    # ---------- Visión, Claude, archivos ----------
+    def ver_pantalla(self, pregunta="¿Qué hay en la pantalla?"):
+        import base64
+        import io
+
+        import pyautogui
+        from openai import OpenAI
+
+        from . import config
+        img = pyautogui.screenshot()
+        img.thumbnail((1600, 1600))
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, "JPEG", quality=80)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        mensaje = [{"role": "user", "content": [
+            {"type": "text", "text": pregunta + " Responde en español, breve."},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]}]
+        errores = []
+        for prov, modelo in (("groq", "meta-llama/llama-4-scout-17b-16e-instruct"),
+                             ("gemini", "gemini-2.5-flash")):
+            clave = config.clave(self.cfg, prov)
+            if not clave:
+                continue
+            try:
+                c = OpenAI(api_key=clave, base_url=config.URLS_PROVEEDOR[prov], timeout=40, max_retries=0)
+                r = c.chat.completions.create(model=modelo, messages=mensaje, max_tokens=400)
+                return r.choices[0].message.content
+            except Exception as e:
+                errores.append(f"{prov}: {e}")
+        return "No pude analizar la pantalla. " + " | ".join(errores)
+
+    def preguntar_a_claude(self, pregunta):
+        webbrowser.open("https://claude.ai/new?q=" + urllib.parse.quote(pregunta))
+        return "Abrí Claude con tu pregunta."
+
+    def listar_carpeta(self, ruta="~"):
+        ruta = os.path.expandvars(os.path.expanduser(ruta))
+        items = sorted(os.listdir(ruta))[:80]
+        return "\n".join(("[carpeta] " if os.path.isdir(os.path.join(ruta, i)) else "") + i for i in items) or "Vacía."
+
+    def escribir_archivo(self, ruta, contenido):
+        ruta = os.path.expandvars(os.path.expanduser(ruta))
+        os.makedirs(os.path.dirname(ruta) or ".", exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(contenido)
+        return f"Archivo guardado: {ruta}"
+
+    # ---------- Autoaprendizaje ----------
+    def crear_habilidad(self, nombre, descripcion, codigo):
+        return self.habilidades.crear(nombre, descripcion, codigo)
+
+    def usar_habilidad(self, nombre, argumentos=None):
+        if isinstance(argumentos, str):
+            try:
+                argumentos = json.loads(argumentos or "{}")
+            except json.JSONDecodeError:
+                argumentos = {}
+        return self.habilidades.usar(nombre, argumentos)
+
+    def instalar_paquete(self, paquete):
+        return self.habilidades.instalar_paquete(paquete)
+
+    def ejecutar_python(self, codigo):
+        return self.habilidades.ejecutar_python(codigo)
+
+    def cambiar_voz(self, voz, idioma="es"):
+        clave = "voz_en" if idioma == "en" else "voz"
+        self.cfg["voz"][clave] = voz
+        from . import config
+        config.guardar_valor(["voz", clave], voz)
+        return f"Voz cambiada a {voz}."
+
+    # ---------- Correo ----------
+    def correo(self, cuenta=None, buscar=None, solo_no_leidos=True):
+        return self.agenda["correo"].resumen(cuenta, solo_no_leidos, buscar)
+
+    def enviar_correo(self, para, asunto, cuerpo, cuenta=None):
+        return self.agenda["correo"].enviar(para, asunto, cuerpo, cuenta)
+
+    # ---------- Música ----------
+    def poner_musica(self, busqueda, varias=False):
+        return self.musica.reproducir(busqueda, varias)
+
+    def controlar_musica(self, accion, nivel=None):
+        return self.musica.control(accion, nivel)
+
+    def apple_music(self, busqueda):
+        return self.musica.apple_music(busqueda)
+
+    # ---------- Investigación web ----------
+    def investigar_web(self, consulta, paginas=3):
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
+        res = list(DDGS().text(consulta, max_results=8))
+        if not res:
+            return "Sin resultados."
+        salida = ["RESULTADOS:"] + [f"- {r['title']}: {r['body']} ({r['href']})" for r in res[:8]]
+        for r in res[:max(0, min(4, int(paginas)))]:
+            try:
+                salida.append(f"\nPÁGINA {r['href']}:\n" + _texto_pagina(r["href"], 1800))
+            except Exception:
+                pass
+        return "\n".join(salida)[:7000]
+
+    def leer_pagina(self, url):
+        return _texto_pagina(url, 5000)
+
+
+def _texto_pagina(url, limite):
+    from bs4 import BeautifulSoup
+    r = requests.get(url, timeout=12, headers={"User-Agent": "Mozilla/5.0 JARVIS"})
+    sopa = BeautifulSoup(r.text, "html.parser")
+    for t in sopa(["script", "style", "nav", "footer", "header", "aside", "form"]):
+        t.decompose()
+    return " ".join(sopa.get_text(" ").split())[:limite]

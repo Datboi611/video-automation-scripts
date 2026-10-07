@@ -25,7 +25,9 @@ DEFAULTS = {
         ]
     },
     "stt": {"motor": "auto", "modelo_local": "small"},
-    "voz": {"motor": "edge", "voz": "es-MX-JorgeNeural", "voz_en": "en-GB-RyanNeural", "velocidad": "+25%"},
+    "voz": {"motor": "edge", "voz": "en-US-AndrewMultilingualNeural", "voz_en": "en-US-AndrewMultilingualNeural",
+            "velocidad": "+8%"},
+    "agenda": {"google_calendar_ics": "", "todoist_token": ""},
     "telefono": {
         "ntfy_servidor": "https://ntfy.sh",
         "ntfy_tema": "",
@@ -33,6 +35,7 @@ DEFAULTS = {
         "control_remoto": False,
     },
     "minutos_reposo": 30,
+    "segundos_silencio": 1.6,
     "microfono": None,
 }
 
@@ -62,17 +65,23 @@ def _merge(base, extra):
 
 
 def _migrar(usuario, ruta):
-    """Actualiza un config.json de la versión 1 a los nuevos valores por defecto."""
-    if usuario.get("_version", 1) >= 2:
+    """Actualiza un config.json viejo a los nuevos valores por defecto."""
+    v = usuario.get("_version", 1)
+    if v >= 3:
         return
     if usuario.get("tratamiento") == "señor":
         usuario["tratamiento"] = "jefe"
-    voz = usuario.get("voz", {})
-    if voz.get("velocidad") == "+8%":
-        voz["velocidad"] = "+25%"
     for k in ("conversacion_continua", "segundos_conversacion"):
         usuario.pop(k, None)
-    usuario["_version"] = 2
+    voz = usuario.setdefault("voz", {})
+    if voz.get("voz") in (None, "es-MX-JorgeNeural"):
+        voz["voz"] = "en-US-AndrewMultilingualNeural"
+    if voz.get("voz_en") in (None, "en-GB-RyanNeural"):
+        voz["voz_en"] = "en-US-AndrewMultilingualNeural"
+    if voz.get("velocidad") in (None, "+8%", "+25%"):
+        voz["velocidad"] = "+8%"
+    usuario.setdefault("agenda", {"google_calendar_ics": "", "todoist_token": ""})
+    usuario["_version"] = 3
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
 
@@ -102,3 +111,18 @@ def clave(cfg, proveedor):
         if p["nombre"] == proveedor and p.get("api_key"):
             return p["api_key"]
     return None
+
+
+def guardar_valor(camino, valor):
+    """Cambia un valor dentro de config.json (p. ej. ["voz", "voz"])."""
+    ruta = os.path.join(BASE, "config.json")
+    datos = {}
+    if os.path.exists(ruta):
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+    d = datos
+    for k in camino[:-1]:
+        d = d.setdefault(k, {})
+    d[camino[-1]] = valor
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)

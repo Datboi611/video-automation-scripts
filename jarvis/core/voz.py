@@ -41,11 +41,13 @@ class Voz:
             return
         self._parar.clear()
         if self.cfg["motor"] == "edge":
-            try:
-                voz = self.cfg.get("voz_en", "en-GB-RyanNeural") if idioma == "en" else self.cfg["voz"]
-                return self._edge(texto, voz)
-            except Exception as e:
-                log.warning("edge-tts falló (%s), uso voz offline", e)
+            elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
+            respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-MX-JorgeNeural"
+            for voz in dict.fromkeys([elegida, respaldo]):
+                try:
+                    return self._edge(texto, voz)
+                except Exception as e:
+                    log.warning("edge-tts falló con %s: %s", voz, e)
         self._sapi(texto)
 
     def _edge(self, texto, voz):

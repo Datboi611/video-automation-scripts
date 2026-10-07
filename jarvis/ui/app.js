@@ -131,12 +131,64 @@ const log = $("log");
 window.J = {
   setState(s) {
     estado = s;
+    const a = document.getElementById("audio");
+    if (a) a.volume = s === "hablando" ? volMusica * 0.2 : volMusica;  // baja la música mientras habla
     $("estado").textContent = TEXTOS[s] || s.toUpperCase();
     if (s !== "hablando" && s !== "escuchando") nivelObj = 0;
   },
   setLevel(v) { nivelObj = Math.max(0, Math.min(1, v)); },
   setStatus(txt) { $("estado").textContent = txt.toUpperCase(); },
   setHint(txt) { $("hint").textContent = txt; },
+  mostrarChat() { $("chat").hidden = false; },
+  proceso(id, texto, paso) {
+    const ul = $("procesos");
+    ul.querySelector(".vacio")?.remove();
+    let li = document.getElementById("pr-" + id);
+    if (!li) {
+      li = document.createElement("li");
+      li.id = "pr-" + id;
+      li.innerHTML = '<span class="dot"></span><span><span class="t"></span><small></small></span>';
+      ul.prepend(li);
+      while (ul.children.length > 6) ul.lastChild.remove();
+    }
+    li.querySelector(".t").textContent = texto.length > 70 ? texto.slice(0, 68) + "…" : texto;
+    li.querySelector("small").textContent = paso === "hecho" ? "completado" : paso === "error" ? "error" : paso;
+    li.className = paso === "hecho" ? "hecho" : paso === "error" ? "error" : "";
+  },
+  panel(titulo, texto) {
+    const cont = $("paneles");
+    const id = "pn-" + titulo.toLowerCase().replace(/[^a-z0-9]/g, "");
+    document.getElementById(id)?.remove();
+    const c = document.createElement("section");
+    c.className = "card"; c.id = id;
+    const h = document.createElement("h4");
+    h.textContent = titulo.toUpperCase();
+    const x = document.createElement("button"); x.textContent = "✕"; x.onclick = () => c.remove();
+    h.append(x);
+    const pre = document.createElement("pre");
+    // títulos de sección en MAYÚSCULAS seguidos de ":" se resaltan
+    texto.split("\n").forEach((l, i) => {
+      if (i) pre.append("\n");
+      if (/^[A-ZÁÉÍÓÚÑ ]{4,}( \(\d+\))?:/.test(l)) { const b = document.createElement("b"); b.textContent = l; pre.append(b); }
+      else pre.append(l);
+    });
+    c.append(h, pre);
+    cont.prepend(c);
+    while (cont.children.length > 3) cont.lastChild.remove();
+  },
+  musica(p) {
+    const a = $("audio");
+    a.src = p.url; a.volume = volMusica; a.play().catch(() => {});
+    $("pista-t").textContent = p.titulo; $("pista-c").textContent = p.canal || "";
+    $("player").hidden = false; $("player").classList.remove("pausa"); $("p-play").textContent = "❚❚";
+  },
+  musicaControl(accion, nivel) {
+    const a = $("audio");
+    if (/paus|stop|para/.test(accion) && !/detener/.test(accion)) { a.pause(); $("player").classList.add("pausa"); $("p-play").textContent = "▶"; }
+    else if (/reanud|play|contin|resum/.test(accion)) { a.play(); $("player").classList.remove("pausa"); $("p-play").textContent = "❚❚"; }
+    else if (/deten|quita|apaga/.test(accion)) { a.pause(); a.removeAttribute("src"); $("player").hidden = true; }
+    else if (/vol/.test(accion) && nivel != null) { volMusica = Math.max(0, Math.min(1, nivel / 100)); a.volume = volMusica; }
+  },
   addMsg(rol, texto) {
     const d = document.createElement("div");
     d.className = "msg " + rol;
@@ -150,6 +202,12 @@ window.J = {
 };
 
 const api = () => window.pywebview && window.pywebview.api;
+let volMusica = 0.6;
+$("toggle-chat").addEventListener("click", () => { $("chat").hidden = !$("chat").hidden; if (!$("chat").hidden) $("entrada").focus(); });
+$("p-play").addEventListener("click", () => J.musicaControl($("audio").paused ? "reanudar" : "pausar"));
+$("p-stop").addEventListener("click", () => J.musicaControl("detener"));
+$("p-next").addEventListener("click", () => api() && api().musica("siguiente"));
+$("audio").addEventListener("ended", () => api() && api().musica("siguiente"));
 
 $("form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -186,6 +244,10 @@ window.addEventListener("pywebviewready", stats);
 setTimeout(() => {
   if (api()) return;
   J.setHint("Vista previa — ejecuta main.py para activar a JARVIS");
+  J.proceso(1, "¿Qué tengo pendiente hoy?", "resumen del dia");
+  J.proceso(2, "Pon música lo-fi para estudiar", "hecho");
+  J.panel("Tu día", "CALENDARIO:\nhoy 11:00: Física 2210\nhoy 15:10: Examen licencia Utah\n\nTODOIST:\nVENCIDA ayer: Quiz 4\nhoy: Writing: Implicit Bias Test (prioridad alta)\n\nPENDIENTES PERSONALES:\n[Pill&Go] Probar el actor Carlos (alta)");
+  $("player").hidden = false; $("pista-t").textContent = "lofi hip hop radio – beats to study"; $("pista-c").textContent = "Lofi Girl";
   const ciclo = ["escuchando", "pensando", "hablando", "dormido"];
   let i = 0;
   setInterval(() => { J.setState(ciclo[++i % 4]); }, 3000);

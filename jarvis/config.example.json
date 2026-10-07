@@ -2,32 +2,43 @@
   "nombre_usuario": "",
   "tratamiento": "jefe",
   "tratamiento_en": "boss",
-
   "activacion": {
     "palabra": "jarvis",
     "aplausos": true,
-    "umbral_aplauso": 0.30
+    "umbral_aplauso": 0.3
   },
-
   "llm": {
     "_ayuda": "Se usan en orden; si uno falla pasa al siguiente. Claves gratis: console.groq.com/keys y aistudio.google.com/apikey",
     "proveedores": [
-      { "nombre": "groq",   "api_key": "", "modelo": "llama-3.3-70b-versatile" },
-      { "nombre": "gemini", "api_key": "", "modelo": "gemini-2.5-flash" },
-      { "nombre": "ollama", "modelo": "qwen2.5:7b", "url": "http://localhost:11434/v1" }
+      {
+        "nombre": "groq",
+        "api_key": "",
+        "modelo": "llama-3.3-70b-versatile"
+      },
+      {
+        "nombre": "gemini",
+        "api_key": "",
+        "modelo": "gemini-2.5-flash"
+      },
+      {
+        "nombre": "ollama",
+        "modelo": "qwen2.5:7b",
+        "url": "http://localhost:11434/v1"
+      }
     ]
   },
-
-  "stt": { "_ayuda": "auto = Groq si hay clave, si no Whisper local", "motor": "auto", "modelo_local": "small" },
-
-  "voz": {
-    "_ayuda": "Voces: es-MX-JorgeNeural, es-ES-AlvaroNeural, es-CO-GonzaloNeural, es-AR-TomasNeural, es-PE-AlexNeural. motor: edge u offline",
-    "motor": "edge",
-    "voz": "es-MX-JorgeNeural",
-    "voz_en": "en-GB-RyanNeural",
-    "velocidad": "+25%"
+  "stt": {
+    "_ayuda": "auto = Groq si hay clave, si no Whisper local",
+    "motor": "auto",
+    "modelo_local": "small"
   },
-
+  "voz": {
+    "_ayuda": "Voces naturales: en-US-AndrewMultilingualNeural, en-US-BrianMultilingualNeural (hablan español e inglés), es-MX-JorgeNeural, es-ES-AlvaroNeural. motor: edge u offline",
+    "motor": "edge",
+    "voz": "en-US-AndrewMultilingualNeural",
+    "voz_en": "en-US-AndrewMultilingualNeural",
+    "velocidad": "+8%"
+  },
   "telefono": {
     "_ayuda": "ntfy_tema: nombre largo y secreto (ej. jarvis-diego-8f3k2q). telegram_usuario: tu @usuario de Telegram",
     "ntfy_servidor": "https://ntfy.sh",
@@ -35,8 +46,27 @@
     "telegram_usuario": "",
     "control_remoto": false
   },
-
   "_ayuda_reposo": "Minutos sin hablar antes de dormirse. Despierta con 'Jarvis', doble aplauso o clic",
   "minutos_reposo": 30,
-  "microfono": null
+  "microfono": null,
+  "_version": 3,
+  "agenda": {
+    "_ayuda": "google_calendar_ics: Google Calendar > Configuración > tu calendario > 'Dirección secreta en formato iCal'. todoist_token: Todoist > Configuración > Integraciones > Desarrollador",
+    "google_calendar_ics": "",
+    "todoist_token": ""
+  },
+  "correo": [
+    {
+      "nombre": "personal",
+      "email": "",
+      "app_password": ""
+    },
+    {
+      "nombre": "universidad",
+      "email": "",
+      "app_password": ""
+    }
+  ],
+  "segundos_silencio": 1.6,
+  "_ayuda_correo": "Usa una 'contraseña de aplicación': Gmail (myaccount.google.com/apppasswords) o iCloud (appleid.apple.com). Correo de universidad Outlook: reenvíalo a tu Gmail."
 }
