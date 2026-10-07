@@ -4,6 +4,7 @@
 """
 import json
 import logging
+import urllib.parse
 import re
 import threading
 import time
@@ -61,13 +62,27 @@ class Telefono:
         decir = f'<Say voice="{voz}" language="es-MX">{escape(mensaje[:900])}</Say>'
         twiml = (f'<Response><Pause length="1"/>{decir}<Pause length="1"/>'
                  f'<Say voice="{voz}" language="es-MX">Repito.</Say>{decir}</Response>')
-        r = requests.post(
-            f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/Calls.json",
-            auth=(t["twilio_sid"], t["twilio_token"]), timeout=20,
-            data={"To": t["mi_numero"], "From": t["twilio_numero"], "Twiml": twiml})
-        if r.status_code >= 400:
-            raise RuntimeError(r.json().get("message", r.text[:200]))
-        return "Llamando a su teléfono."
+        url_api = f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/Calls.json"
+        base = {"To": t["mi_numero"], "From": t["twilio_numero"]}
+        # Las cuentas de prueba no aceptan el parámetro Twiml: se entrega el guion por URL (Twimlets echo,
+        # servicio de Twilio). Si eso fallara, se prueba el Twiml directo (cuentas de pago).
+        intentos = [
+            {**base, "Url": "https://twimlets.com/echo?" + urllib.parse.urlencode({"Twiml": twiml}), "Method": "GET"},
+            {**base, "Twiml": twiml},
+            {**base, "Url": "https://twimlets.com/message?" + urllib.parse.urlencode({"Message[0]": mensaje[:500]}),
+             "Method": "GET"},
+        ]
+        ultimo = ""
+        for datos in intentos:
+            r = requests.post(url_api, auth=(t["twilio_sid"], t["twilio_token"]), timeout=20, data=datos)
+            if r.status_code < 400:
+                return "Llamando a su teléfono."
+            try:
+                ultimo = r.json().get("message", r.text[:200])
+            except ValueError:
+                ultimo = r.text[:200]
+            log.warning("Twilio rechazó un intento: %s", ultimo)
+        raise RuntimeError(ultimo)
 
     def llamar(self, mensaje):
         error_twilio = None
