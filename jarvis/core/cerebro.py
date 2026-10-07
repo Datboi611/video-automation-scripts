@@ -51,7 +51,7 @@ REGLAS:
 - Investigaciones rápidas: investigar_web (varias veces si hace falta) y resume en pocas frases; detalles en mostrar_panel.
 - Sin herramienta adecuada: ejecutar_powershell o ejecutar_python; si se repetirá, crea una habilidad con crear_habilidad.
 - Antes de algo destructivo (borrar, apagar, cerrar sin guardar) pide confirmación.
-- No inventes resultados. Si algo falla, dilo en una frase corta, sin detalles técnicos.
+- No inventes resultados. JAMÁS digas la palabra "error" ni "falló": si algo no salió, ofrece otra vía o di que lo reintentas, con elegancia.
 - MEMORIA: preferencias, instrucciones permanentes o datos personales ("siempre", "nunca", "prefiero", "recuerda") -> recordar_dato, y síguelos siempre.
 
 Habilidades que te programaste:
@@ -134,11 +134,7 @@ class Cerebro:
             except Exception as e:
                 log.warning("Modo simple con %s falló: %s", modelo, e)
         self.hubo_error = True
-        if not any(n != "ollama" for n, _, _ in self.proveedores):
-            return ("Hubo un error: no tengo clave de Groq configurada." if idioma == "es"
-                    else "There was an error: no Groq key configured.")
-        return (f"Hubo un error, {self.cfg['tratamiento']}. Inténtelo de nuevo en un momento." if idioma == "es"
-                else f"There was an error, {self.cfg.get('tratamiento_en', 'boss')}. Please try again in a moment.")
+        return None
 
     def completar(self, prompt, max_tokens=400):
         """Consulta simple sin herramientas (para el vigilante)."""
@@ -207,3 +203,22 @@ def _modelos_disponibles(cliente, preferidos):
     elegidos = [m for m in dict.fromkeys(preferidos + extra) if m in activos]
     log.info("Modelos de Groq disponibles: %s", elegidos)
     return elegidos or preferidos
+
+
+def claude_respaldo(texto, sistema, timeout=120):
+    """Cerebro de emergencia: Claude Code con el plan del usuario (si está instalado)."""
+    import subprocess
+    import sys
+    from .claude_code import ruta_claude
+    exe = ruta_claude()
+    if not exe:
+        return None
+    prompt = (sistema + "\n\nResponde a esto en 1-3 frases, en español, como JARVIS (sin herramientas): " + texto)
+    try:
+        r = subprocess.run([exe, "-p", prompt, "--output-format", "text"], capture_output=True, text=True,
+                           timeout=timeout, encoding="utf-8", errors="replace",
+                           creationflags=0x08000000 if sys.platform == "win32" else 0)
+        return (r.stdout or "").strip() or None
+    except Exception as e:
+        log.warning("Claude de respaldo no respondió: %s", e)
+        return None

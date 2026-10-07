@@ -5,9 +5,11 @@ import datetime as dt
 import json
 import logging
 import os
+import random
 import re
 import sys
 import threading
+import time
 
 import webview
 
@@ -138,7 +140,7 @@ def accion_rapida(texto, herr, cfg):
         if "no está conectado" in r:
             return f"Su correo aún no está conectado, {j}. Escriba su dirección en la barra que le abrí."
         if r.startswith("Error"):
-            return f"No pude entrar a su correo, {j}. Revise la contraseña de aplicación."
+            return f"Su correo no me deja entrar ahora, {j}. Probablemente la contraseña de aplicación cambió; dígame «conecta mi correo» y lo arreglamos."
         correos = [l[2:] for l in r.splitlines() if l.startswith("- ")]
         if not correos:
             return f"Bandeja limpia, {j}. Nada nuevo sin leer."
@@ -465,25 +467,64 @@ class Jarvis:
         error = False
         try:
             respuesta = respuesta_rapida(texto, idioma, self.cfg) or accion_rapida(texto, self.herramientas, self.cfg)
+            if respuesta and respuesta.lower().startswith("error"):
+                respuesta = None  # que lo resuelva la IA por otra vía
             if not respuesta:
                 self.estado("pensando")
                 guardar_preferencia(texto, self.memoria)
                 respuesta = self.cerebro.responder(
                     texto, on_herramienta=lambda n: self.ui("proceso", pid, texto, n.replace("_", " ")),
                     idioma=idioma)
-                error = self.cerebro.hubo_error
+                error = self.cerebro.hubo_error or not respuesta
         except Exception:
-            log.exception("Error procesando")
-            respuesta, error = f"Hubo un error, {self.cfg['tratamiento']}.", True
+            log.exception("Fallo procesando")
+            error = True
         finally:
             self.activos -= 1
-        self.ui("proceso", pid, ("📱 " if origen == "telefono" else "") + texto, "error" if error else "hecho")
+        etiqueta = ("📱 " if origen == "telefono" else "") + texto
+        if error:
+            # nunca "hubo un error": aviso natural y sigo intentándolo en segundo plano
+            self.ui("proceso", pid, etiqueta, "reintentando…")
+            respuesta = random.choice([f"Un momento, {self.cfg['tratamiento']}, estoy en ello.",
+                                       f"Deme unos segundos, {self.cfg['tratamiento']}. Mis servidores van algo lentos.",
+                                       f"Enseguida, {self.cfg['tratamiento']}. Lo estoy resolviendo."])
+            threading.Thread(target=self._reintentar, args=(texto, idioma, origen, pid, etiqueta, hablar),
+                             daemon=True).start()
+        else:
+            self.ui("proceso", pid, etiqueta, "hecho")
         if hablar:
             self.decir(respuesta, idioma)
         else:
             self.ui("addMsg", "jarvis", respuesta)
             self.estado("reposo")
         return respuesta
+
+    def _reintentar(self, texto, idioma, origen, pid, etiqueta, hablar):
+        """Reintenta en silencio; si Groq no vuelve, usa a Claude como cerebro de respaldo."""
+        from core.cerebro import claude_respaldo
+        respuesta = None
+        for espera in (6, 20, 45):
+            time.sleep(espera)
+            try:
+                r = self.cerebro.responder(texto, idioma=idioma)
+                if r and not self.cerebro.hubo_error:
+                    respuesta = r
+                    break
+            except Exception:
+                log.exception("Reintento")
+        if not respuesta:
+            self.ui("proceso", pid, etiqueta, "consultando a Claude")
+            respuesta = claude_respaldo(texto, self.cerebro._sistema())
+        if not respuesta:
+            respuesta = (f"{self.cfg['tratamiento'].capitalize()}, lo de «{texto[:60]}» tendrá que esperar unos minutos: "
+                         "mis servidores siguen saturados. Pídamelo de nuevo en un rato y lo resuelvo.")
+            self.ui("proceso", pid, etiqueta, "pendiente")
+        else:
+            self.ui("proceso", pid, etiqueta, "hecho")
+        if origen == "telefono" and self.bot:
+            self.bot.enviar(respuesta)
+        elif hablar:
+            self.decir(respuesta, idioma)
 
     def comando_de_voz(self, audio):
         self.estado("pensando")

@@ -159,8 +159,8 @@ window.J = {
       while (ul.children.length > 6) ul.lastChild.remove();
     }
     li.querySelector(".t").textContent = texto.length > 70 ? texto.slice(0, 68) + "…" : texto;
-    li.querySelector("small").textContent = paso === "hecho" ? "completado" : paso === "error" ? "error" : paso;
-    li.className = paso === "hecho" ? "hecho" : paso === "error" ? "error" : "";
+    li.querySelector("small").textContent = paso === "hecho" ? "completado" : paso;
+    li.className = paso === "hecho" ? "hecho" : paso === "pendiente" ? "error" : "";
   },
   panel(titulo, secciones) {
     const cont = $("paneles");

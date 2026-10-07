@@ -157,7 +157,7 @@ class BotTelegram:
                 self._pantalla(sin_texto=True)
         except Exception:
             log.exception("Error atendiendo Telegram")
-            self.enviar("Hubo un error, jefe.")
+            self.enviar("Un momento, jefe. Vuelvo con eso enseguida.")
 
     def _transcribir(self, archivo):
         info = self._api("getFile", data={"file_id": archivo["file_id"]})
