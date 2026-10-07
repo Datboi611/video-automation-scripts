@@ -16,8 +16,9 @@ Vives en su PC con Windows y lo controlas por completo mediante herramientas.
 Ahora es {dia} {fecha}, {hora}.
 
 Estilo:
-- Responde SIEMPRE en español, de forma breve (1-3 frases): tus respuestas se leen en voz alta.
-- Tono elegante, eficiente y con un toque de humor británico. Llámalo "{tratamiento}".
+- Responde en el MISMO idioma en que te habla el usuario (español o inglés).
+- Sé breve (1-3 frases): tus respuestas se leen en voz alta.
+- Tono elegante, eficiente y con un toque de humor británico. En español llámalo "{tratamiento}"; en inglés, "{tratamiento_en}".
 - Sin markdown, listas ni emojis; habla natural.
 
 Reglas:
@@ -43,21 +44,28 @@ class Cerebro:
             if p["nombre"] != "ollama" and not p.get("api_key"):
                 continue
             url = p.get("url") or config.URLS_PROVEEDOR.get(p["nombre"])
-            cliente = OpenAI(api_key=p.get("api_key") or "ollama", base_url=url, timeout=60, max_retries=0)
-            self.proveedores.append((p["nombre"], cliente, p["modelo"]))
+            timeout = 120 if p["nombre"] == "ollama" else 25
+            cliente = OpenAI(api_key=p.get("api_key") or "ollama", base_url=url, timeout=timeout, max_retries=0)
+            modelos = [p["modelo"]] + [m for m in config.RESPALDO_MODELOS.get(p["nombre"], []) if m != p["modelo"]]
+            for m in modelos:
+                self.proveedores.append((p["nombre"], cliente, m))
 
     def _sistema(self):
         ahora = dt.datetime.now()
         return SISTEMA.format(
             usuario=self.cfg["nombre_usuario"] or "su creador", tratamiento=self.cfg["tratamiento"],
+            tratamiento_en=self.cfg.get("tratamiento_en", "boss"),
             dia=DIAS[ahora.weekday()], fecha=ahora.strftime("%d/%m/%Y"), hora=ahora.strftime("%H:%M"),
             memoria=self.memoria.texto(),
         )
 
-    def responder(self, texto, on_herramienta=lambda n: None):
-        mensajes = [{"role": "system", "content": self._sistema()}] + self.historial[-12:] + [
+    def responder(self, texto, on_herramienta=lambda n: None, idioma="es"):
+        sistema = self._sistema()
+        if idioma == "en":
+            sistema += "\n\nThe user is speaking ENGLISH right now: answer in English."
+        mensajes = [{"role": "system", "content": sistema}] + self.historial[-12:] + [
             {"role": "user", "content": texto}]
-        ultimo_error = None
+        errores = []
         for nombre, cliente, modelo in self.proveedores:
             acciones = []
             try:
@@ -65,19 +73,23 @@ class Cerebro:
                 self.historial += [{"role": "user", "content": texto}, {"role": "assistant", "content": respuesta}]
                 return respuesta
             except Exception as e:
-                ultimo_error = e
-                log.warning("Proveedor %s falló: %s", nombre, e)
+                errores.append(f"{nombre}/{modelo}: {str(e)[:120]}")
+                log.warning("Proveedor %s (%s) falló: %s", nombre, modelo, e)
                 if acciones:  # no repetir acciones ya ejecutadas con otro proveedor
                     return "Hice parte de la tarea, pero perdí la conexión con mi cerebro antes de terminar."
         if not self.proveedores:
             return "No tengo ningún cerebro configurado. Añade una clave gratuita de Groq o instala Ollama."
-        return f"Disculpe, no puedo conectar con mis servidores. {ultimo_error}"
+        sin_clave = not any(n != "ollama" for n, _, _ in self.proveedores)
+        if sin_clave:
+            return ("No tengo clave de Groq configurada y Ollama no está instalado. "
+                    "Pega tu clave gratuita de Groq en config.json y reiníciame.")
+        return "No pude conectar con mis servidores. Detalle: " + " | ".join(errores[:2])
 
     def _bucle(self, cliente, modelo, mensajes, on_herramienta, acciones):
         for _ in range(8):
             r = cliente.chat.completions.create(
                 model=modelo, messages=mensajes, tools=self.herr.esquemas(), tool_choice="auto",
-                temperature=0.4, max_tokens=600,
+                temperature=0.4, max_tokens=400,
             )
             msg = r.choices[0].message
             if not msg.tool_calls:

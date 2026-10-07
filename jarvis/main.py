@@ -67,11 +67,11 @@ class Jarvis:
             from core.audio import Escucha
             from core.oido import Oido
             self.oido = Oido(c)
-            self.escucha = Escucha(c, self.estado, self.nivel, self.comando_de_voz)
-            self.escucha.iniciar()
+            self.escucha = Escucha(c, self.estado, self.nivel, self.comando_de_voz, self.despertar)
             modos = ["di «" + c["activacion"]["palabra"].capitalize() + "»" if self.escucha.rec else None,
                      "aplaude dos veces" if c["activacion"]["aplausos"] else None, "toca la esfera"]
-            self.ui("setHint", " · ".join(m for m in modos if m))
+            self.ui("setHint", f"Te escucho siempre · tras {c['minutos_reposo']} min sin hablar descanso; "
+                               "para despertarme: " + ", ".join(m for m in modos if m))
         except Exception as e:
             log.exception("Micrófono no disponible")
             self.ui("setHint", f"Micrófono no disponible ({e}). Puedes escribirme.")
@@ -83,28 +83,37 @@ class Jarvis:
             self.ui("addMsg", "sistema", "No hay cerebro configurado: añade tu clave gratuita de Groq en config.json o instala Ollama.")
         h = dt.datetime.now().hour
         saludo = "Buenos días" if 5 <= h < 12 else "Buenas tardes" if h < 20 else "Buenas noches"
-        self.decir(f"{saludo}, {c['tratamiento']}. Todos los sistemas operativos.")
-        self.estado("reposo")
+        self.decir(f"{saludo}, {c['tratamiento']}. Todos los sistemas operativos. Le escucho.")
+        try:
+            self.escucha.iniciar()
+        except Exception as e:
+            log.exception("No pude abrir el micrófono")
+            self.escucha = None
+            self.ui("setHint", f"Micrófono no disponible ({e}). Puedes escribirme.")
+            self.estado("reposo")
 
     # ---------- Flujo principal ----------
-    def decir(self, texto):
+    def decir(self, texto, idioma="es"):
         self.ui("addMsg", "jarvis", texto)
         self.estado("hablando")
         if self.escucha:
             self.escucha.silencio.set()
         try:
-            self.voz.hablar(texto)
+            self.voz.hablar(texto, idioma)
         finally:
             if self.escucha:
                 self.escucha.silencio.clear()
 
-    def procesar(self, texto, hablar=True):
+    def procesar(self, texto, hablar=True, idioma="es"):
+        if self.escucha:
+            self.escucha.actividad()
         with self.lock:
             self.ui("addMsg", "usuario", texto)
             self.estado("pensando")
-            respuesta = self.cerebro.responder(texto, on_herramienta=lambda n: self.ui("setStatus", f"Ejecutando {n}…"))
+            respuesta = self.cerebro.responder(
+                texto, on_herramienta=lambda n: self.ui("setStatus", f"Ejecutando {n}…"), idioma=idioma)
             if hablar:
-                self.decir(respuesta)
+                self.decir(respuesta, idioma)
             else:
                 self.ui("addMsg", "jarvis", respuesta)
             self.estado("reposo")
@@ -112,15 +121,21 @@ class Jarvis:
 
     def comando_de_voz(self, audio):
         self.estado("pensando")
-        texto = self.oido.transcribir(audio)
+        texto, idioma = self.oido.transcribir(audio)
         if not texto:
             return False
-        if texto.lower().strip(" .!¡") in ("gracias", "eso es todo", "nada", "adiós", "listo"):
+        limpio = texto.lower().strip(" .!¡?¿,")
+        if any(f in limpio for f in ("descansa", "duérmete", "duermete", "modo reposo", "go to sleep", "sleep mode")):
             self.ui("addMsg", "usuario", texto)
-            self.decir(f"A su servicio, {self.cfg['tratamiento']}.")
+            self.decir("Entrando en reposo. Aplauda o diga Jarvis cuando me necesite." if idioma == "es"
+                       else "Going to sleep. Clap or say Jarvis when you need me.", idioma)
+            self.escucha.dormir()
             return False
-        self.procesar(texto)
+        self.procesar(texto, idioma=idioma)
         return True
+
+    def despertar(self):
+        self.decir(f"¿Sí, {self.cfg['tratamiento']}?")
 
     def recordatorio_vencido(self, r):
         aviso = f"{self.cfg['tratamiento'].capitalize()}, le recuerdo: {r['mensaje']}"

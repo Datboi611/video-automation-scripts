@@ -6,8 +6,9 @@ const COLORES = {
   escuchando: [80, 230, 255],
   pensando:   [120, 110, 255],
   hablando:   [60, 190, 255],
+  dormido:    [20, 70, 140],
 };
-const TEXTOS = { reposo: "EN ESPERA", escuchando: "ESCUCHANDO", pensando: "PROCESANDO", hablando: "RESPONDIENDO" };
+const TEXTOS = { reposo: "EN ESPERA", escuchando: "ESCUCHANDO", pensando: "PROCESANDO", hablando: "RESPONDIENDO", dormido: "EN REPOSO" };
 
 let estado = "reposo", nivel = 0, nivelObj = 0, color = [...COLORES.reposo], giro = 0, velGiro = 0.004;
 const N = 900, puntos = [];
@@ -42,8 +43,8 @@ function dibujar(t) {
   const obj = COLORES[estado] || COLORES.reposo;
   color = color.map((c, i) => c + (obj[i] - c) * 0.06);
   nivel += (nivelObj - nivel) * 0.25;
-  const respira = estado === "reposo" ? 0.04 * Math.sin(t * 1.6) : 0;
-  const objGiro = { reposo: 0.004, escuchando: 0.008, pensando: 0.03, hablando: 0.012 }[estado];
+  const respira = estado === "reposo" || estado === "dormido" ? 0.04 * Math.sin(t * (estado === "dormido" ? 0.8 : 1.6)) : 0;
+  const objGiro = { reposo: 0.004, escuchando: 0.008, pensando: 0.03, hablando: 0.012, dormido: 0.0015 }[estado];
   velGiro += (objGiro - velGiro) * 0.05;
   giro += velGiro;
   const k = 1 + respira + nivel * 0.18;
@@ -185,7 +186,7 @@ window.addEventListener("pywebviewready", stats);
 setTimeout(() => {
   if (api()) return;
   J.setHint("Vista previa — ejecuta main.py para activar a JARVIS");
-  const ciclo = ["reposo", "escuchando", "pensando", "hablando"];
+  const ciclo = ["escuchando", "pensando", "hablando", "dormido"];
   let i = 0;
   setInterval(() => { J.setState(ciclo[++i % 4]); }, 3000);
   setInterval(() => { if (estado === "hablando" || estado === "escuchando") J.setLevel(Math.random()); }, 90);

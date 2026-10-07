@@ -1,6 +1,7 @@
 {
   "nombre_usuario": "",
-  "tratamiento": "señor",
+  "tratamiento": "jefe",
+  "tratamiento_en": "boss",
 
   "activacion": {
     "palabra": "jarvis",
@@ -23,7 +24,8 @@
     "_ayuda": "Voces: es-MX-JorgeNeural, es-ES-AlvaroNeural, es-CO-GonzaloNeural, es-AR-TomasNeural, es-PE-AlexNeural. motor: edge u offline",
     "motor": "edge",
     "voz": "es-MX-JorgeNeural",
-    "velocidad": "+8%"
+    "voz_en": "en-GB-RyanNeural",
+    "velocidad": "+25%"
   },
 
   "telefono": {
@@ -34,7 +36,7 @@
     "control_remoto": false
   },
 
-  "conversacion_continua": true,
-  "segundos_conversacion": 6,
+  "_ayuda_reposo": "Minutos sin hablar antes de dormirse. Despierta con 'Jarvis', doble aplauso o clic",
+  "minutos_reposo": 30,
   "microfono": null
 }

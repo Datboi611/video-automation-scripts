@@ -10,7 +10,8 @@ from . import config
 log = logging.getLogger("jarvis")
 
 ALUCINACIONES = (
-    "gracias por ver", "subtítulos", "amara.org", "suscríbete", "¡gracias!", "gracias.",
+    "gracias por ver", "subtítulos", "amara.org", "suscríbete", "thanks for watching",
+    "thank you for watching", "like and subscribe",
 )
 
 
@@ -39,32 +40,33 @@ class Oido:
             from openai import OpenAI
             self._groq = OpenAI(api_key=self.key_groq, base_url=config.URLS_PROVEEDOR["groq"], timeout=20)
         r = self._groq.audio.transcriptions.create(
-            model="whisper-large-v3-turbo", file=("voz.wav", _wav(audio)), language="es",
-            prompt="Jarvis, abre Chrome, recuérdame, pon música.",
+            model="whisper-large-v3-turbo", file=("voz.wav", _wav(audio)),
+            response_format="verbose_json", prompt="Jarvis.",
         )
-        return r.text
+        return r.text, getattr(r, "language", "") or ""
 
     def _transcribir_local(self, audio):
         if self._local is None:
             from faster_whisper import WhisperModel
             self._local = WhisperModel(self.cfg["stt"]["modelo_local"], device="cpu", compute_type="int8")
-        segs, _ = self._local.transcribe(
-            audio.astype(np.float32) / 32768, language="es", beam_size=1,
-            initial_prompt="Jarvis, abre Chrome, recuérdame, pon música.",
+        segs, info = self._local.transcribe(
+            audio.astype(np.float32) / 32768, beam_size=1, initial_prompt="Jarvis.",
         )
-        return " ".join(s.text for s in segs)
+        return " ".join(s.text for s in segs), info.language
 
     def transcribir(self, audio):
-        texto = ""
+        """Devuelve (texto, idioma) con idioma 'es' o 'en'."""
         if self.motor == "groq":
             try:
-                texto = self._transcribir_groq(audio)
+                texto, idioma = self._transcribir_groq(audio)
             except Exception as e:
                 log.warning("Groq STT falló (%s), uso modelo local", e)
-                texto = self._transcribir_local(audio)
+                texto, idioma = self._transcribir_local(audio)
         else:
-            texto = self._transcribir_local(audio)
+            texto, idioma = self._transcribir_local(audio)
         texto = texto.strip()
-        if len(texto) < 2 or any(a == texto.lower() or a in texto.lower() and len(texto) < 40 for a in ALUCINACIONES):
-            return ""
-        return texto
+        idioma = "en" if idioma.lower() in ("en", "english") else "es"
+        bajo = texto.lower()
+        if len(texto) < 2 or any(a in bajo for a in ALUCINACIONES) and len(texto) < 40:
+            return "", idioma
+        return texto, idioma

@@ -35,19 +35,20 @@ class Voz:
             import pygame
             pygame.mixer.stop()
 
-    def hablar(self, texto):
+    def hablar(self, texto, idioma="es"):
         texto = limpiar(texto)
         if not texto:
             return
         self._parar.clear()
         if self.cfg["motor"] == "edge":
             try:
-                return self._edge(texto)
+                voz = self.cfg.get("voz_en", "en-GB-RyanNeural") if idioma == "en" else self.cfg["voz"]
+                return self._edge(texto, voz)
             except Exception as e:
                 log.warning("edge-tts falló (%s), uso voz offline", e)
         self._sapi(texto)
 
-    def _edge(self, texto):
+    def _edge(self, texto, voz):
         import edge_tts
         import numpy as np
         import pygame
@@ -55,7 +56,7 @@ class Voz:
         ruta = os.path.join(self.carpeta, f"{uuid.uuid4().hex}.mp3")
 
         async def generar():
-            await edge_tts.Communicate(texto, self.cfg["voz"], rate=self.cfg["velocidad"]).save(ruta)
+            await edge_tts.Communicate(texto, voz, rate=self.cfg["velocidad"]).save(ruta)
 
         asyncio.run(generar())
         if not self._mixer:

@@ -25,9 +25,9 @@ Asistente personal estilo Iron Man: interfaz holográfica azul, se activa dicien
 
 ## Cómo usarlo
 
-- Di **«Jarvis»**, aplaude **dos veces** o toca la esfera → suena un *bip* → da tu orden.
-- Tras responder sigue escuchando unos segundos (conversación continua). Di «gracias» para terminar.
-- También puedes escribir en la caja de texto. `Esc` corta la voz.
+- JARVIS **te escucha siempre**: solo háblale. Responde en español o inglés según cómo le hables.
+- Tras **30 min sin hablarle** entra en reposo. Despiértalo diciendo **«Jarvis»**, con **dos aplausos** o tocando la esfera.
+- Dile «descansa» / «go to sleep» para dormirlo antes. También puedes escribir en la caja de texto. `Esc` corta la voz.
 
 Ejemplos:
 - «Jarvis, abre Spotify y pon la siguiente canción»

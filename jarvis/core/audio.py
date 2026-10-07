@@ -55,11 +55,13 @@ class DetectorAplausos:
 
 class Escucha:
     """Hilo de escucha. Callbacks:
-    on_estado(str), on_nivel(float), on_comando(audio_int16) -> bool (seguir conversando)."""
+    on_estado(str), on_nivel(float), on_comando(audio_int16) -> bool (hubo conversación real)."""
 
-    def __init__(self, cfg, on_estado, on_nivel, on_comando):
+    def __init__(self, cfg, on_estado, on_nivel, on_comando, on_despertar=lambda: None):
         self.cfg = cfg
         self.on_estado, self.on_nivel, self.on_comando = on_estado, on_nivel, on_comando
+        self.on_despertar = on_despertar
+        self.ultimo = time.time()
         self.cola = queue.Queue()
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
@@ -144,55 +146,72 @@ class Escucha:
             if self._detecta_palabra(frame):
                 return "voz"
 
+    def actividad(self):
+        """Reinicia el contador de inactividad (también al escribir en la interfaz)."""
+        self.ultimo = time.time()
+
+    def dormir(self):
+        self.ultimo = 0
+
     def _grabar(self, espera_max):
-        """Graba hasta 0.9 s de silencio tras hablar. None si nadie habla."""
-        umbral = max(self.ruido * 3.5, 0.012)
-        frames, hablando, silencio, inicio = [], False, 0, time.time()
+        """Graba una frase (termina tras 0.8 s de silencio). None si nadie habla."""
+        frames, hablando, silencio, voz, inicio = [], False, 0, 0, time.time()
         while True:
-            if self._manual.is_set():  # clic durante la escucha = cancelar
-                self._manual.clear()
-                return None
+            self._manual.clear()
             frame = self._leer()
             if frame is None:
+                if time.time() - inicio > espera_max:
+                    return None
                 continue
             x = frame.astype(np.float32) / 32768
             rms = float(np.sqrt(np.mean(x * x)))
+            umbral = max(self.ruido * 3.5, 0.012)
             self.on_nivel(min(1.0, rms * 12))
             if rms > umbral:
-                hablando, silencio = True, 0
+                hablando, silencio, voz = True, 0, voz + 1
             elif hablando:
                 silencio += 1
+            else:
+                self.ruido = max(0.003, 0.98 * self.ruido + 0.02 * rms)
             if hablando or len(frames) < 10:
                 frames.append(frame)
             else:
                 frames = frames[-10:] + [frame]  # conserva 300 ms previos
-            dur = time.time() - inicio
-            if not hablando and dur > espera_max:
-                return None
-            if hablando and (silencio > 30 or dur > 20):
+            if hablando and silencio > 26:
+                if voz < 8:  # ruido corto (golpe, tos): se ignora
+                    frames, hablando, silencio, voz = [], False, 0, 0
+                    continue
                 return np.concatenate(frames)
+            if hablando and len(frames) > 30 * 20:  # máximo 30 s
+                return np.concatenate(frames)
+            if not hablando and time.time() - inicio > espera_max:
+                return None
 
     def _loop(self):
+        """Siempre escuchando. Tras N minutos sin hablar entra en reposo;
+        se despierta con «Jarvis», doble aplauso o clic en la esfera."""
+        reposo = self.cfg["minutos_reposo"] * 60
+        self.ultimo = time.time()
         while True:
             try:
-                self.on_estado("reposo")
-                origen = self._esperar_activacion()
-                log.info("Activado por %s", origen)
-                beep()
-                self._vaciar()
-                espera = 7
-                while True:
-                    self.on_estado("escuchando")
-                    audio = self._grabar(espera)
-                    if audio is None:
-                        break
-                    seguir = self.on_comando(audio)
+                if time.time() - self.ultimo > reposo:
+                    self.on_estado("dormido")
+                    origen = self._esperar_activacion()
+                    log.info("Despertado por %s", origen)
+                    beep()
                     self._vaciar()
-                    if self.rec:
-                        self.rec.Reset()
-                    if not (seguir and self.cfg["conversacion_continua"]):
-                        break
-                    espera = self.cfg["segundos_conversacion"]
+                    self.ultimo = time.time()
+                    self.on_despertar()
+                self.on_estado("escuchando")
+                restante = reposo - (time.time() - self.ultimo)
+                audio = self._grabar(espera_max=max(1, min(30, restante)))
+                if audio is None:
+                    continue
+                if self.on_comando(audio):
+                    self.ultimo = time.time()
+                self._vaciar()
+                if self.rec:
+                    self.rec.Reset()
             except Exception:
                 log.exception("Error en el bucle de escucha")
                 time.sleep(1)
