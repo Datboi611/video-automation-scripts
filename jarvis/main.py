@@ -414,6 +414,19 @@ class Jarvis:
                     log.warning("Prueba Twilio: %s", e)
                     msg = ("Guardé los datos, pero Twilio rechazó la llamada. Si su cuenta es de prueba, "
                            "verifique su número en Twilio, en Verified Caller IDs.")
+        elif campo == "telegram_chat_id":
+            cid = re.sub(r"[^\d-]", "", valor)
+            if not cid:
+                return self.decir("Ese no parece un Id de Telegram, jefe. Son solo números, se lo da @userinfobot.")
+            c.setdefault("telegram_bot", {})["chat_id"] = cid
+            config.guardar_valor(["telegram_bot", "chat_id"], cid)
+            if self.bot:
+                self.bot.cfg["chat_id"], self.bot.codigo = cid, None
+                ok = self.bot.enviar("✅ Vinculado, jefe. Desde ahora le obedezco aquí también. Comandos: /hoy /pantalla /estado")
+            else:
+                ok = False
+            msg = (f"Teléfono vinculado, {c['tratamiento']}. Le acabo de escribir por Telegram." if ok else
+                   "Guardé su Id, pero no pude escribirle: abra su bot en Telegram, pulse Iniciar y pídame un mensaje de prueba.")
         elif campo == "telegram_usuario":
             u = valor if valor.startswith("@") else "@" + valor
             c["telefono"]["telegram_usuario"] = u
