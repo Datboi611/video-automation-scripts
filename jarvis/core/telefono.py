@@ -56,13 +56,17 @@ class Telefono:
         return "Llamando a su teléfono."
 
     def llamar(self, mensaje):
+        error_twilio = None
         if self.twilio_listo:
             try:
                 return self.llamar_twilio(mensaje)
             except Exception as e:
+                error_twilio = str(e)
                 log.warning("Twilio falló, uso CallMeBot: %s", e)
         if not self.telegram:
-            return "No hay usuario de Telegram configurado (telefono.telegram_usuario)."
+            if error_twilio:
+                return f"Twilio rechazó la llamada: {error_twilio[:150]}"
+            return "Las llamadas no están configuradas. Dígame «configura las llamadas»."
         r = requests.get(
             "https://api.callmebot.com/start.php",
             # cc=yes: copia en texto (en iPhone la llamada suena pero Telegram no reproduce el audio)

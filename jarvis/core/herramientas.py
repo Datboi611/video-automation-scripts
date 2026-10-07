@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import threading
 import sys
 import urllib.parse
 import webbrowser
@@ -83,6 +84,7 @@ SPECS = [
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
     ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
      {"motivo": (S, "Qué necesitas que escriba")}),
+    ("diagnostico", "Revisa que todos los servicios funcionen (IA, Telegram, llamadas, voz, Todoist, Canvas, correo).", {}),
     ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
      {"que": (S, "pendientes | anuncios | notas | cursos")}, []),
     ("canvas_abrir", "Abre Canvas en el navegador (un curso o una tarea concreta).", {"busqueda": (S, "Curso o tarea, opcional")}, []),
@@ -143,7 +145,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -450,18 +452,39 @@ class Herramientas:
     def olvidar_dato(self, texto):
         return f"Olvidados: {self.memoria.olvidar(texto)}."
 
-    def notificar_telefono(self, mensaje):
-        return self.telefono.notificar(mensaje)
-
-    def llamar_telefono(self, mensaje):
-        r = self.telefono.llamar(mensaje)
+    def _bot_listo(self):
         bot = getattr(self, "bot", None)
-        if bot:
-            bot.enviar_voz(mensaje)
-        return r
+        return bot if bot and bot.activo and bot.cfg.get("chat_id") else None
+
+    def notificar_telefono(self, mensaje):
+        bot = self._bot_listo()
+        if bot and bot.enviar(mensaje):
+            return "Mensaje enviado a su iPhone por Telegram."
+        if self.telefono.tema:
+            return self.telefono.notificar(mensaje)
+        return self._sin_bot()
 
     def mensaje_telegram(self, mensaje):
-        return self.telefono.mensaje_telegram(mensaje)
+        return self.notificar_telefono(mensaje)
+
+    def _sin_bot(self):
+        bot = getattr(self, "bot", None)
+        if bot and bot.activo and bot.codigo:
+            return (f"Su iPhone aún no está vinculado: envíe el código {bot.codigo} a su bot de Telegram "
+                    "y vuelva a pedírmelo.")
+        return "Su iPhone no está conectado. Dígame «conecta mi iPhone» para configurarlo."
+
+    def llamar_telefono(self, mensaje):
+        try:
+            r = self.telefono.llamar(mensaje)
+        except Exception as e:
+            log.warning("Llamada falló: %s", e)
+            r = "No pude completar la llamada."
+        bot = self._bot_listo()
+        if bot:  # copia en audio y texto por si la llamada no entra
+            bot.enviar("📞 " + mensaje)
+            threading.Thread(target=bot.enviar_voz, args=(mensaje,), daemon=True).start()
+        return r
 
     # ---------- Agenda ----------
     def resumen_del_dia(self, dias=1):
@@ -682,6 +705,10 @@ class Herramientas:
             self.ui("panel", titulo, sec)
         return "Mostrado en el panel."
 
+
+    def diagnostico(self):
+        from . import diagnostico
+        return diagnostico.revisar(self.cfg, self)
 
     def canvas(self, que="pendientes"):
         from .canvas import SesionExpirada

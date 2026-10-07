@@ -78,6 +78,8 @@ class Cerebro:
             timeout = 120 if p["nombre"] == "ollama" else 40 if p["nombre"] == "claude" else 25
             cliente = OpenAI(api_key=p.get("api_key") or "ollama", base_url=url, timeout=timeout, max_retries=0)
             modelos = [p["modelo"]] + [m for m in config.RESPALDO_MODELOS.get(p["nombre"], []) if m != p["modelo"]]
+            if p["nombre"] == "groq":
+                modelos = _modelos_disponibles(cliente, modelos)
             for m in modelos:
                 self.proveedores.append((p["nombre"], cliente, m))
 
@@ -119,6 +121,17 @@ class Cerebro:
                         return respuesta
                     except Exception as e2:
                         log.warning("Reintento falló: %s", e2)
+        # último recurso: responder sin herramientas para no quedarse mudo
+        for nombre, cliente, modelo in self.proveedores[:3]:
+            try:
+                r = cliente.chat.completions.create(model=modelo, messages=mensajes[:1] + mensajes[-1:],
+                                                    temperature=0.6, max_tokens=300)
+                respuesta = (r.choices[0].message.content or "").strip()
+                if respuesta:
+                    log.info("Respondí sin herramientas con %s", modelo)
+                    return respuesta
+            except Exception as e:
+                log.warning("Modo simple con %s falló: %s", modelo, e)
         self.hubo_error = True
         if not any(n != "ollama" for n, _, _ in self.proveedores):
             return ("Hubo un error: no tengo clave de Groq configurada." if idioma == "es"
@@ -180,3 +193,16 @@ def _segundos_reintento(e):
     if m:
         return int(m.group(1) or 0) * 60 + float(m.group(2))
     return 3
+
+
+def _modelos_disponibles(cliente, preferidos):
+    """Groq retira modelos con el tiempo: usa solo los que existen hoy, en orden de preferencia."""
+    try:
+        activos = {m.id for m in cliente.models.list().data}
+    except Exception as e:
+        log.warning("No pude listar modelos de Groq: %s", e)
+        return preferidos
+    extra = ["openai/gpt-oss-120b", "moonshotai/kimi-k2-instruct", "qwen/qwen3-32b"]
+    elegidos = [m for m in dict.fromkeys(preferidos + extra) if m in activos]
+    log.info("Modelos de Groq disponibles: %s", elegidos)
+    return elegidos or preferidos

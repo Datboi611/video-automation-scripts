@@ -67,7 +67,7 @@ def respuesta_rapida(texto, idioma, cfg):
 
 
 PANEL = {  # herramienta -> título del menú lateral donde se muestra su resultado
-    "canvas": "Canvas",
+    "canvas": "Canvas", "diagnostico": "Diagnóstico",
     "resumen_del_dia": "Tu día", "calendario": "Calendario", "todoist": "Todoist", "pendientes": "Pendientes",
     "listar_recordatorios": "Recordatorios", "correo": "Correo", "clima": "Clima", "info_sistema": "Sistema",
     "ver_pantalla": "Lo que veo", "buscar_archivos": "Archivos", "listar_carpeta": "Carpeta",
@@ -109,6 +109,44 @@ def accion_rapida(texto, herr, cfg):
         return "Reanudando."
     if re.fullmatch(r"(siguiente|la siguiente|siguiente canci[oó]n|next|cambia de canci[oó]n|otra canci[oó]n)", t):
         return herr.ejecutar("controlar_musica", {"accion": "siguiente"})
+    # llamadas y mensajes al teléfono: directo, sin depender de la IA
+    m = re.match(r"^(?:ll[aá]mame|hazme una llamada|llama a mi (?:celular|tel[eé]fono|iphone))"
+                 r"(?:\s+en\s+(\d+)\s*(?:minutos?|min))?(?:\s*(?:para|y|a)\s+(.*))?$", t)
+    if m:
+        minutos, motivo = m.group(1), (m.group(2) or "").strip()
+        motivo = re.sub(r"^(?:recordarme|decirme|dime|avisarme)\s+(?:que\s+)?", "", motivo)
+        if motivo in ("", "probar", "prueba", "una prueba", "probarlo", "ver si funciona"):
+            motivo = ""
+        if minutos:
+            r = herr.ejecutar("crear_recordatorio", {"mensaje": motivo or "Llamada programada", "en_minutos": int(minutos),
+                                                     "llamar": True})
+            return f"Le llamaré en {minutos} minutos, {j}." if r.startswith("Recordatorio") else r
+        msg = (f"{j.capitalize()}, le habla JARVIS. " + (f"Le recuerdo: {motivo}." if motivo
+               else "Esta es una llamada de prueba. Todo funciona correctamente."))
+        r = herr.ejecutar("llamar_telefono", {"mensaje": msg})
+        return f"Llamándole ahora, {j}." if r.startswith("Llamando") or r.startswith("Llamada") else r
+    m = re.match(r"^(?:m[aá]ndame|env[ií]ame|escr[ií]beme|manda|env[ií]a)\s+(?:un\s+)?(?:mensaje|texto|nota|aviso)?"
+                 r"\s*(?:(?:por|al|a mi|a)\s+(?:telegram|celular|tel[eé]fono|iphone|m[oó]vil))?\s*"
+                 r"(?:diciendo|que diga|con|que|:)?\s*(.*)$", t)
+    if m and re.search(r"mensaje|texto|nota|aviso|telegram|celular|tel[eé]fono|iphone", t):
+        cuerpo = re.sub(r"^(de )?prueba$", "", m.group(1).strip()) or "Prueba de JARVIS ✅ Todo funciona, jefe."
+        r = herr.ejecutar("notificar_telefono", {"mensaje": cuerpo[:1].upper() + cuerpo[1:]})
+        return f"Enviado a su iPhone, {j}." if r.startswith("Mensaje enviado") or r.startswith("Notificación") else r
+    if re.search(r"\b(revisa|checa|chequea|mira|lee|tengo|hay)\b.*\b(correo|correos|mail|mails|email|inbox|bandeja)\b", t):
+        r = herr.ejecutar("correo", {"solo_no_leidos": True})
+        if "no está conectado" in r:
+            return f"Su correo aún no está conectado, {j}. Escriba su dirección en la barra que le abrí."
+        if r.startswith("Error"):
+            return f"No pude entrar a su correo, {j}. Revise la contraseña de aplicación."
+        correos = [l[2:] for l in r.splitlines() if l.startswith("- ")]
+        if not correos:
+            return f"Bandeja limpia, {j}. Nada nuevo sin leer."
+        de, _, resto = correos[0].partition(":")
+        asunto = resto.split("—")[0].strip()
+        return (f"Tiene {len(correos)} correo{'s' if len(correos) > 1 else ''} sin leer, {j}. "
+                f"El más reciente es de {de.strip()}: {asunto}. Le dejé el resto en el panel.")
+    if re.fullmatch(r"(haz|hazte|corre|ejecuta)( un)? (diagn[oó]stico|chequeo|revisi[oó]n)( del sistema| de todo)?|diagn[oó]stico", t):
+        return herr.ejecutar("diagnostico", {})
     m = re.match(r"^(?:marca|marcar|completa|tacha)\s+(.+?)\s+como\s+(?:hech[ao]|completad[ao]|terminad[ao]|lista|listo)$", t) \
         or re.match(r"^(?:ya )?(?:hice|termin[eé]|complet[eé])\s+(?:el |la |los |las )?(.+)$", t)
     if m:
