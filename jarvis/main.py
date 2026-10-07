@@ -19,6 +19,8 @@ from core.correo import Correo
 from core.integraciones import Calendario, Pendientes, Todoist
 from core.musica import Musica
 from core import paneles
+from core.telegram_bot import BotTelegram
+from core.vigilante import Vigilante
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -117,6 +119,7 @@ class Jarvis:
         self.listo = threading.Event()
         self.lock_voz = threading.Lock()
         self.escucha = None
+        self.bot = None
         self.activos = 0
         self._n = 0
 
@@ -179,6 +182,12 @@ class Jarvis:
         if c["telefono"]["control_remoto"]:
             self.telefono.escuchar_ordenes(self.orden_remota)
 
+        # JARVIS en el iPhone (bot de Telegram) y vigilante de la agenda
+        self.bot = BotTelegram(c, self, lambda k, v: config.guardar_valor(["telegram_bot", k], v))
+        self.iniciar_bot()
+        self.vigilante = Vigilante(c, self, os.path.join(config.DATOS, "avisos.json"))
+        self.vigilante.iniciar()
+
         if not self.cerebro.proveedores:
             self.ui("pedirTexto", "Falta tu clave de Groq en config.json")
         h = dt.datetime.now().hour
@@ -206,6 +215,14 @@ class Jarvis:
         except Exception:
             log.exception("No pude armar el panel")
 
+    def iniciar_bot(self):
+        if not self.bot.activo:
+            return
+        self.bot.iniciar()
+        if self.bot.codigo:
+            self.ui("panel", "Vincular iPhone", [{"t": "Código", "tono": "warn", "items": [
+                {"x": " ".join(self.bot.codigo), "sub": "Envíalo a tu bot en Telegram desde el iPhone", "tags": []}]}])
+
     def guardar_campo(self, campo, valor):
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
         valor = valor.strip()
@@ -223,6 +240,24 @@ class Jarvis:
             else:
                 self.herramientas.agenda["calendario"].url = valor
                 msg = f"Calendario conectado, {c['tratamiento']}."
+        elif campo == "telegram_bot_token":
+            c.setdefault("telegram_bot", {})["token"] = valor
+            c["telegram_bot"]["chat_id"] = ""
+            config.guardar_valor(["telegram_bot"], {"token": valor, "chat_id": ""})
+            self.bot = BotTelegram(c, self, lambda k, v: config.guardar_valor(["telegram_bot", k], v))
+            try:
+                self.bot._api("getMe")
+            except Exception:
+                return self.decir("Telegram rechazó ese token, jefe. Revise que esté completo.")
+            self.iniciar_bot()
+            msg = (f"Bot conectado, {c['tratamiento']}. Envíele desde su iPhone el código que le muestro en el panel: "
+                   f"{' '.join(self.bot.codigo or '')}.")
+        elif campo == "telegram_usuario":
+            u = valor if valor.startswith("@") else "@" + valor
+            c["telefono"]["telegram_usuario"] = u
+            self.telefono.telegram = u
+            config.guardar_valor(["telefono", "telegram_usuario"], u)
+            msg = f"Listo, {c['tratamiento']}. Si se le olvida algo importante, le llamaré a {u}."
         elif campo == "elevenlabs_api_key":
             c["voz"]["elevenlabs_api_key"] = valor
             c["voz"]["motor"] = "elevenlabs"
@@ -258,7 +293,7 @@ class Jarvis:
                     self.escucha.silencio.clear()
                 self.estado("escuchando" if self.escucha else "reposo")
 
-    def procesar(self, texto, hablar=True, idioma="es"):
+    def procesar(self, texto, hablar=True, idioma="es", origen="voz"):
         """Cada pedido es un proceso independiente: pueden correr varios a la vez."""
         if self.escucha:
             self.escucha.actividad()
@@ -266,7 +301,7 @@ class Jarvis:
         pid = self._n
         self.activos += 1
         self.ui("addMsg", "usuario", texto)
-        self.ui("proceso", pid, texto, "en curso")
+        self.ui("proceso", pid, ("📱 " if origen == "telefono" else "") + texto, "en curso")
         error = False
         try:
             respuesta = respuesta_rapida(texto, idioma, self.cfg) or accion_rapida(texto, self.herramientas, self.cfg)
@@ -282,7 +317,7 @@ class Jarvis:
             respuesta, error = f"Hubo un error, {self.cfg['tratamiento']}.", True
         finally:
             self.activos -= 1
-        self.ui("proceso", pid, texto, "error" if error else "hecho")
+        self.ui("proceso", pid, ("📱 " if origen == "telefono" else "") + texto, "error" if error else "hecho")
         if hablar:
             self.decir(respuesta, idioma)
         else:

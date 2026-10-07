@@ -105,3 +105,25 @@ class Oido:
         if len(texto) < 2 or any(a in bajo for a in ALUCINACIONES) and len(texto) < 40:
             return "", idioma
         return texto, idioma
+
+    def transcribir_archivo(self, datos, nombre="nota.ogg"):
+        """Notas de voz del teléfono (ogg/m4a/mp3)."""
+        try:
+            if self.key_groq:
+                if self._groq is None:
+                    from openai import OpenAI
+                    self._groq = OpenAI(api_key=self.key_groq, base_url=config.URLS_PROVEEDOR["groq"], timeout=30)
+                r = self._groq.audio.transcriptions.create(
+                    model="whisper-large-v3", file=(nombre, datos), language="es", prompt=VOCABULARIO, temperature=0)
+                return r.text.strip()
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix="." + nombre.split(".")[-1], delete=False) as f:
+                f.write(datos)
+            if self._local is None:
+                from faster_whisper import WhisperModel
+                self._local = WhisperModel(self.cfg["stt"]["modelo_local"], device="cpu", compute_type="int8")
+            segs, _ = self._local.transcribe(f.name, language="es", initial_prompt=VOCABULARIO)
+            return " ".join(s.text for s in segs).strip()
+        except Exception as e:
+            log.warning("No pude transcribir la nota de voz: %s", e)
+            return ""

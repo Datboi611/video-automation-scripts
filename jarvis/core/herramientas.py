@@ -77,7 +77,7 @@ SPECS = [
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
     ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
-     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key"),
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_usuario"),
       "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
     ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
@@ -157,7 +157,7 @@ CATEGORIAS = {
     "web": (r"busca|investiga|internet|web|google|wikipedia|qu[ié]n es|qu[eé] es|clima|tiempo|noticia|precio|p[aá]gina|"
             r"search|research|weather|news|claude|link|url",
             {"leer_pagina", "consultar_wikipedia", "clima", "abrir_web", "buscar_en_internet", "preguntar_a_claude"}),
-    "telefono": (r"tel[eé]fono|celular|llam|notifica|telegram|avísame|avisame|phone|call",
+    "telefono": (r"tel[eé]fono|celular|iphone|llam|notifica|telegram|avísame|avisame|phone|call|bot",
                  {"notificar_telefono", "llamar_telefono", "mensaje_telegram"}),
     "memoria": (r"olvida|memoria|voz|habla m[aá]s|habilidad|aprende|forget|voice",
                 {"olvidar_dato", "cambiar_voz", "usar_habilidad", "crear_habilidad"}),
@@ -636,7 +636,9 @@ class Herramientas:
                   "gemini_api_key": "Pega tu clave de Gemini (aistudio.google.com/apikey)",
                   "claude_api_key": "Pega tu clave de API de Claude (console.anthropic.com)",
                   "groq_api_key": "Pega tu clave de Groq",
-                  "elevenlabs_api_key": "Pega tu clave de ElevenLabs (elevenlabs.io → API Keys)"}
+                  "elevenlabs_api_key": "Pega tu clave de ElevenLabs (elevenlabs.io → API Keys)",
+                  "telegram_bot_token": "Pega el token de tu bot de Telegram (te lo da @BotFather)",
+                  "telegram_usuario": "Escribe tu @usuario de Telegram (para las llamadas)"}
         if campo not in textos:
             return f"Campo no válido. Opciones: {', '.join(textos)}."
         if getattr(self, "ui", None):

@@ -57,6 +57,18 @@ Ejemplos:
 - **Correo**: Gmail → myaccount.google.com/apppasswords · iCloud → appleid.apple.com → «Contraseñas de apps». Pon email y esa contraseña en `correo`. El correo de la universidad (Outlook) reenvíalo a tu Gmail.
 - **Recomendado**: clave gratis de **Gemini** (aistudio.google.com/apikey) como respaldo cuando Groq llegue a su límite por minuto.
 
+## JARVIS en tu iPhone (Telegram, gratis)
+
+1. En Telegram, abre **@BotFather** → `/newbot` → ponle nombre (ej. *Jarvis de Diego*) y un usuario que termine en `bot`. Copia el **token**.
+2. En el PC dile: «Jarvis, conecta mi iPhone» → pega el token en la barra.
+3. JARVIS muestra un **código de 6 dígitos** en el panel → envíaselo a tu bot desde el iPhone. Queda vinculado (solo tu chat puede darle órdenes).
+4. Escríbele o mándale **notas de voz**. Comandos: `/pantalla` (captura del PC), `/hoy` (agenda), `/estado`.
+
+**Vigilante** (automático, en `config.json` → `vigilante`): resumen a las 08:00, aviso 30 min antes de cada evento, revisiones a las 14:00 y 19:00 y **llamada a las 20:30** si sigue algo importante de hoy sin hacer (no llama entre 23:00 y 07:30).
+Para las llamadas: abre **@CallMeBot_txtbot** en Telegram y pulsa Iniciar, luego dile a JARVIS «quiero que me llames» y escribe tu @usuario.
+
+Para controlar el PC con el ratón desde el iPhone: **Chrome Remote Desktop** (gratis, remotedesktop.google.com).
+
 ## Conectar tu celular (gratis)
 
 **Notificaciones (ntfy):**
