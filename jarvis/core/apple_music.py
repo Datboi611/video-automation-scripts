@@ -1,5 +1,6 @@
 """Apple Music (app de Windows): abre la app, entra a una playlist por su nombre y le da a Reproducir.
 Apple no tiene API para la app de escritorio, así que se maneja su interfaz con UI Automation (pywinauto)."""
+import difflib
 import logging
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import unicodedata
 log = logging.getLogger("jarvis")
 APP_ID = r"shell:AppsFolder\AppleInc.AppleMusicWin_nzyj5cx40ttxa!App"
 BOTON_PLAY = ("reproducir", "play", "reproducir todo", "play all")
+BOTON_ALEATORIO = ("aleatorio", "shuffle", "reproduccion aleatoria", "reproducir en orden aleatorio", "mezclar")
 
 
 def _norm(t):
@@ -30,24 +32,57 @@ def _ventana(timeout=20):
     return None
 
 
-def _buscar(win, nombre, tipos=None):
-    """Elemento cuyo nombre coincide con 'nombre' (exacto primero, luego que lo contenga)."""
-    objetivo = _norm(nombre)
-    exactos, parciales = [], []
+def _elementos(win):
+    salida = []
     for el in win.descendants():
         try:
-            if tipos and el.element_info.control_type not in tipos:
-                continue
             n = _norm(el.window_text())
+            if n:
+                salida.append((n, el))
         except Exception:
-            continue
-        if not n:
-            continue
-        if n == objetivo:
-            exactos.append(el)
-        elif objetivo in n and len(n) < len(objetivo) + 25:
-            parciales.append(el)
-    return (exactos or parciales or [None])[0]
+            pass
+    return salida
+
+
+def _buscar(win, nombre, tipos=None, intentos=3):
+    """Elemento cuyo nombre se parece a 'nombre' (exacto, contenido o muy parecido). Reintenta porque
+    el reproductor web de Apple Music (Chromium) carga su árbol de accesibilidad poco a poco."""
+    objetivo = _norm(nombre)
+    for i in range(intentos):
+        mejor, puntaje = None, 0.0
+        for n, el in _elementos(win):
+            try:
+                if tipos and el.element_info.control_type not in tipos:
+                    continue
+            except Exception:
+                continue
+            if n == objetivo:
+                p = 1.0
+            elif n.startswith(objetivo + " ") or n.startswith(objetivo + ","):
+                p = 0.95
+            else:
+                p = difflib.SequenceMatcher(None, n, objetivo).ratio()
+            if p > puntaje:
+                mejor, puntaje = el, p
+        if puntaje >= 0.8:
+            return mejor
+        time.sleep(1)
+    return None
+
+
+def _boton_cabecera(win, nombres):
+    """Botón de la cabecera de la playlist (no el de la barra del reproductor de abajo)."""
+    try:
+        alto = win.rectangle().top + (win.rectangle().height() * 0.6)
+    except Exception:
+        alto = 10 ** 6
+    for n, el in _elementos(win):
+        try:
+            if n in nombres and el.element_info.control_type == "Button" and el.rectangle().top < alto:
+                return el
+        except Exception:
+            pass
+    return None
 
 
 def _clic(el):
@@ -67,6 +102,10 @@ def reproducir_playlist(nombre):
     win = _ventana(2)
     if not win:
         subprocess.Popen(["explorer.exe", APP_ID])
+        win = _ventana(15)
+    if not win:  # sin la app de la Store: el reproductor web en el navegador
+        import webbrowser
+        webbrowser.open("https://music.apple.com/library/all-playlists/")
         win = _ventana(25)
     if not win:
         return "No pude abrir la app de Apple Music."
@@ -84,16 +123,20 @@ def reproducir_playlist(nombre):
             time.sleep(2)
             item = _buscar(win, nombre)
     if not item:
+        log.warning("Apple Music: no encontré %r. Elementos visibles: %s", nombre,
+                    sorted({n for n, _ in _elementos(win)})[:150])
         return f"No encontré la playlist «{nombre}» en Apple Music."
     try:
         item.click_input()
     except Exception:
         _clic(item)
-    time.sleep(2)
-    for nom in BOTON_PLAY:
-        boton = _buscar(win, nom, ("Button",))
-        if boton and _norm(boton.window_text()) in BOTON_PLAY:
-            _clic(boton)
-            log.info("Apple Music: reproduciendo playlist %s", nombre)
-            return f"Reproduciendo su playlist {nombre} en Apple Music."
-    return f"Abrí la playlist {nombre}, pero no encontré el botón Reproducir."
+    time.sleep(2.5)
+    for nombres, modo in ((BOTON_ALEATORIO, "en aleatorio"), (BOTON_PLAY, "")):  # siempre aleatorio si se puede
+        for _ in range(3):
+            boton = _boton_cabecera(win, nombres)
+            if boton:
+                _clic(boton)
+                log.info("Apple Music: reproduciendo playlist %s %s", nombre, modo)
+                return f"Reproduciendo su playlist {nombre} {modo} en Apple Music.".replace("  ", " ")
+            time.sleep(1)
+    return f"Abrí la playlist {nombre}, pero no encontré el botón de reproducir."
