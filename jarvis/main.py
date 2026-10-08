@@ -29,6 +29,7 @@ from core.canvas import Canvas
 from core.presencia import Presencia, normalizar_mac
 from core.llamadas_vivo import LlamadasVivo
 from core.pillgo import PillGo
+from core.shopify import Shopify
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -72,7 +73,7 @@ def respuesta_rapida(texto, idioma, cfg):
 
 
 PANEL = {  # herramienta -> título del menú lateral donde se muestra su resultado
-    "pillgo_estado": "Pill&Go",
+    "pillgo_estado": "Pill&Go", "shopify_ventas": "Shopify", "shopify_pedidos": "Pedidos", "shopify_inventario": "Inventario",
     "canvas": "Canvas", "diagnostico": "Diagnóstico",
     "resumen_del_dia": "Tu día", "calendario": "Calendario", "todoist": "Todoist", "pendientes": "Pendientes",
     "listar_recordatorios": "Recordatorios", "correo": "Correo", "clima": "Clima", "info_sistema": "Sistema",
@@ -182,6 +183,7 @@ PATRONES_CLAVE = [
     (r"\bsk_[a-f0-9]{40,}\b", "elevenlabs_api_key"),
     (r"\bAIza[0-9A-Za-z_-]{30,}\b", "gemini_api_key"),
     (r"\bAC[a-f0-9]{32}\b", "twilio_sid"),
+    (r"\bshpat_[a-f0-9]{32}\b", "shopify"),
 ]
 
 
@@ -257,6 +259,7 @@ class Jarvis:
             "todoist": Todoist(c["agenda"]["todoist_token"]),
             "pendientes": Pendientes(os.path.join(config.DATOS, "pendientes.json")),
             "correo": Correo(c.get("correo", [])),
+            "shopify": Shopify(c.get("shopify", {}).get("tienda"), c.get("shopify", {}).get("token")),
             "canvas": Canvas(c["agenda"].get("canvas_url"), c["agenda"].get("canvas_token"), config.DATOS),
         }
         self.habilidades = Habilidades(os.path.join(config.BASE, "habilidades"))
@@ -423,6 +426,23 @@ class Jarvis:
                        "Le dejo el motivo en el panel.")
             self.ui("panel", "Twilio", [{"t": "Motivo", "tono": "crit", "items": [{"x": str(e)[:300], "sub": "", "tags": []}]}])
 
+    def guardar_shopify(self, texto):
+        token = re.search(r"shpat_[a-f0-9]{32}", texto).group(0)
+        m = re.search(r"([a-z0-9-]+)\.myshopify\.com", texto, re.I)
+        tienda = (m.group(0) if m else self.cfg.get("shopify", {}).get("tienda", "")).lower()
+        if not tienda:
+            self.herramientas.pedir_dato("shopify", "Falta la tienda: pega tienda.myshopify.com y el token")
+            return self.decir("Me falta el nombre de la tienda, jefe; péguelo junto al token.")
+        self.cfg["shopify"] = {"tienda": tienda, "token": token}
+        config.guardar_valor(["shopify"], self.cfg["shopify"])
+        sh = Shopify(tienda, token)
+        self.herramientas.agenda["shopify"] = sh
+        try:
+            self.decir(f"Shopify conectado, {self.cfg['tratamiento']}. {sh.ventas(1)}")
+        except Exception as e:
+            log.warning("Shopify: %s", e)
+            self.decir("Guardé los datos, pero Shopify no me dejó entrar. Revise que la app tenga los permisos de lectura.")
+
     def guardar_campo(self, campo, valor):
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
         valor = valor.strip()
@@ -572,6 +592,9 @@ class Jarvis:
             self.guardar_twilio(tw)
             return "Configurado."
         campo, valor = detectar_clave(texto)
+        if campo == "shopify":
+            self.guardar_shopify(texto)
+            return "Configurado."
         if campo:  # pegó un token o clave: lo guardo directo, sin preguntar
             self.guardar_campo(campo, valor)
             return "Configurado."
@@ -743,6 +766,9 @@ class Api:
             threading.Thread(target=self._j.guardar_twilio, args=(tw,), daemon=True).start()
             return
         detectado, valor = detectar_clave(texto)
+        if detectado == "shopify" or campo == "shopify":
+            threading.Thread(target=self._j.guardar_shopify, args=(texto,), daemon=True).start()
+            return
         if detectado and (not campo or campo != detectado):
             campo, texto = detectado, valor  # reconoce la clave aunque la barra pidiera otra cosa
         if campo:

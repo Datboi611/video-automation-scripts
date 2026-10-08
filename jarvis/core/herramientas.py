@@ -78,12 +78,15 @@ SPECS = [
      {"texto": (S, "Pendiente"), "proyecto": (S, "Proyecto"), "fecha": (S, "YYYY-MM-DD"), "prioridad": (S, "alta/media/baja")}, ["texto"]),
     ("marcar_hecho", "Marca una tarea como hecha en Todoist y en los pendientes personales.", {"texto": (S, "Parte del nombre de la tarea")}),
     ("pedir_dato", "Muestra la barra para que el usuario escriba un dato de configuración y lo guarda solo (token de Todoist, enlace iCal de Google Calendar, clave de Gemini/Claude).",
-     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_chat_id | telegram_usuario | canvas_token | correo_email | correo_app_password | telefono_mac | twilio_sid | twilio_token | twilio_numero | mi_numero"),
+     {"campo": (S, "todoist_token | google_calendar_ics | gemini_api_key | claude_api_key | groq_api_key | elevenlabs_api_key | telegram_bot_token | telegram_chat_id | telegram_usuario | canvas_token | correo_email | correo_app_password | telefono_mac | shopify | twilio_sid | twilio_token | twilio_numero | mi_numero"),
       "motivo": (S, "Texto que verá en la barra")}, ["campo"]),
     ("mostrar_panel", "Muestra información estructurada en el menú lateral (análisis de ideas, investigaciones, listas).",
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
     ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
      {"motivo": (S, "Qué necesitas que escriba")}),
+    ("shopify_ventas", "Ventas de la tienda Shopify (Ezma Shop): pedidos, total vendido, pendientes de envío.", {"dias": ("integer", "1=hoy, 7=semana")}, []),
+    ("shopify_pedidos", "Últimos pedidos de Shopify con cliente, monto, estado y productos.", {"cantidad": ("integer", "Cuántos")}, []),
+    ("shopify_inventario", "Stock y precios de productos en Shopify.", {"busqueda": (S, "Producto, opcional")}, []),
     ("pillgo_videos", "Genera los 5 videos diarios de Pill&Go (daily.py con la fecha de mañana) en segundo plano y avisa al terminar.", {}),
     ("pillgo_estado", "Estado de la generación de videos de Pill&Go en curso.", {}),
     ("diagnostico", "Revisa que todos los servicios funcionen (IA, Telegram, llamadas, voz, Todoist, Canvas, correo).", {}),
@@ -169,6 +172,8 @@ CATEGORIAS = {
     "web": (r"busca|investiga|internet|web|google|wikipedia|qu[ié]n es|qu[eé] es|clima|tiempo|noticia|precio|p[aá]gina|"
             r"search|research|weather|news|claude|link|url",
             {"leer_pagina", "consultar_wikipedia", "clima", "abrir_web", "buscar_en_internet", "preguntar_a_claude"}),
+    "shopify": (r"shopify|tienda|ezma|vend|venta|pedido|orden|stock|inventario|producto|cliente",
+                {"shopify_ventas", "shopify_pedidos", "shopify_inventario"}),
     "telefono": (r"tel[eé]fono|celular|iphone|llam|notifica|telegram|avísame|avisame|phone|call|bot|casa|salgo|presencia",
                  {"notificar_telefono", "llamar_telefono", "mensaje_telegram"}),
     "memoria": (r"olvida|memoria|voz|habla m[aá]s|habilidad|aprende|forget|voice",
@@ -684,6 +689,7 @@ class Herramientas:
                   "telegram_chat_id": "Escribe tu Id de Telegram (te lo da @userinfobot)",
                   "canvas_token": "Pega tu token de Canvas (Cuenta → Configuración → Nuevo token de acceso)",
                   "correo_email": "Escribe tu correo personal (Gmail o iCloud)",
+                  "shopify": "Pega tu tienda y token juntos, ej: ezmashop.myshopify.com shpat_xxxx",
                   "telefono_mac": "Escribe la Dirección Wi-Fi de tu iPhone (Ajustes → Wi-Fi → ⓘ)",
                   "twilio_sid": "Pega tu Account SID de Twilio (empieza con AC)",
                   "twilio_token": "Pega tu Auth Token de Twilio",
@@ -709,6 +715,25 @@ class Herramientas:
             self.ui("panel", titulo, sec)
         return "Mostrado en el panel."
 
+
+    def _shop(self):
+        sh = self.agenda.get("shopify")
+        if not sh or not sh.listo:
+            self.pedir_dato("shopify")
+            return None
+        return sh
+
+    def shopify_ventas(self, dias=1):
+        sh = self._shop()
+        return sh.ventas(dias) if sh else "Shopify no está conectado: abrí la barra para que pegue tienda y token."
+
+    def shopify_pedidos(self, cantidad=5):
+        sh = self._shop()
+        return sh.pedidos(cantidad) if sh else "Shopify no está conectado: abrí la barra."
+
+    def shopify_inventario(self, busqueda=""):
+        sh = self._shop()
+        return sh.inventario(busqueda) if sh else "Shopify no está conectado: abrí la barra."
 
     def pillgo_videos(self):
         return self.pillgo.iniciar()
