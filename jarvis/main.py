@@ -184,6 +184,7 @@ PATRONES_CLAVE = [
     (r"\bgsk_[A-Za-z0-9]{20,}\b", "groq_api_key"),
     (r"\bsk_[a-f0-9]{40,}\b", "elevenlabs_api_key"),
     (r"\bAIza[0-9A-Za-z_-]{30,}\b", "gemini_api_key"),
+    (r"\bAQ\.[0-9A-Za-z_-]{30,}", "gemini_api_key"),
     (r"\bAC[a-f0-9]{32}\b", "twilio_sid"),
     (r"\bshpat_[a-f0-9]{32}\b", "shopify"),
     (r"\bshpss_[A-Za-z0-9]{20,}\b", "shopify"),
