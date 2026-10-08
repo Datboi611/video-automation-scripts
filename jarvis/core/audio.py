@@ -73,6 +73,7 @@ class Escucha:
         act = cfg["activacion"]
         self.aplausos = DetectorAplausos(act["umbral_aplauso"]) if act["aplausos"] else None
         self.palabra = act["palabra"].lower().strip()
+        self.requiere = act.get("requiere_palabra", True)  # cada conversación empieza diciendo «Jarvis»
         self.rec = self._crear_reconocedor(act["modelo_vosk"])
         self.ruido = 0.01
 
@@ -110,7 +111,8 @@ class Escucha:
     # --- interno ---
     def _callback(self, datos, frames, tiempo, estado):
         frame = datos[:, 0].copy()
-        if not self.silencio.is_set():
+        if (self.requiere and self.rec) or not self.silencio.is_set():
+            # en modo «Jarvis», el micrófono sigue escuchando aunque JARVIS hable: decir «Jarvis» lo corta
             self._eco_frames = 0
             self.cola.put(frame)
             return
@@ -218,7 +220,62 @@ class Escucha:
             if not hablando and time.time() - inicio > espera_max:
                 return None
 
+    def _interrumpir_si_habla(self):
+        if self.silencio.is_set():
+            log.info("«Jarvis» mientras hablaba: lo interrumpo")
+            self.silencio.clear()
+            self.on_interrupcion()
+
+    def _esperar_fin_respuesta(self):
+        """Espera a que JARVIS termine de responder; si el usuario dice «Jarvis», lo corta. True = lo llamaron."""
+        inicio = time.time()
+        while time.time() - inicio < 15 and not self.silencio.is_set():  # aún pensando
+            frame = self._leer()
+            if frame is not None and self._detecta_palabra(frame):
+                return True
+        while self.silencio.is_set():  # hablando
+            frame = self._leer()
+            if frame is not None and self._detecta_palabra(frame):
+                self._interrumpir_si_habla()
+                return True
+        return False
+
+    def _loop_palabra(self):
+        from . import atenuar
+        while True:
+            try:
+                self.on_estado("dormido")
+                origen = self._esperar_activacion()
+                log.info("Activado por %s", origen)
+                self._interrumpir_si_habla()
+                atenuar.bajar()
+                beep()  # solo un tono: así puede hablar de inmediato
+                self._vaciar()
+                espera = 8
+                while True:  # conversación: tras cada respuesta queda unos segundos escuchando
+                    self.on_estado("escuchando")
+                    audio = self._grabar(espera_max=espera)
+                    if audio is None:
+                        break
+                    self.on_comando(audio)
+                    self.ultimo = time.time()
+                    if self.rec:
+                        self.rec.Reset()
+                    if self._esperar_fin_respuesta():
+                        beep()
+                    self._vaciar()
+                    espera = 6
+                atenuar.restaurar()
+                if self.rec:
+                    self.rec.Reset()
+            except Exception:
+                log.exception("Error en el bucle de escucha")
+                atenuar.restaurar()
+                time.sleep(1)
+
     def _loop(self):
+        if self.requiere and self.rec:
+            return self._loop_palabra()
         """Siempre escuchando. Tras N minutos sin hablar entra en reposo;
         se despierta con «Jarvis», doble aplauso o clic en la esfera."""
         reposo = self.cfg["minutos_reposo"] * 60

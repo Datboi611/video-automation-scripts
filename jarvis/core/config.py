@@ -13,6 +13,7 @@ DEFAULTS = {
     "tratamiento_en": "boss",
     "activacion": {
         "palabra": "jarvis",
+        "requiere_palabra": True,
         "aplausos": True,
         "umbral_aplauso": 0.30,
         "modelo_vosk": "modelos/vosk-model-small-en-us-0.15",
