@@ -223,17 +223,19 @@ def _modelos_disponibles(cliente, preferidos):
 
 def _modelos_gemini(cliente, preferidos):
     """Google retira modelos (p. ej. gemini-2.0-flash): usa solo los 'flash' de texto que existan hoy."""
+    # los modelos 1.x/2.x ya fueron retirados: siempre primero los alias que Google mantiene al día
+    preferidos = ["gemini-flash-latest", "gemini-flash-lite-latest"] + [m for m in preferidos if not re.search(r"gemini-[12]\.", m)]
     try:
         activos = [m.id.split("/")[-1] for m in cliente.models.list().data]
     except Exception as e:
         log.warning("No pude listar modelos de Gemini: %s", e)
-        return [m for m in preferidos if "2.0" not in m]
-    malos = ("image", "tts", "live", "audio", "embedding", "preview", "exp", "thinking", "2.0", "1.5")
+        return preferidos
+    malos = ("image", "tts", "live", "audio", "embedding", "preview", "exp", "thinking", "gemini-1", "gemini-2")
     flash = sorted([m for m in activos if "flash" in m and not any(x in m for x in malos)], reverse=True)
-    elegidos = [m for m in preferidos if m in activos and "2.0" not in m] + flash
+    elegidos = preferidos[:2] + [m for m in preferidos[2:] if m in activos] + flash
     elegidos = list(dict.fromkeys(elegidos))[:4]
     log.info("Modelos de Gemini disponibles: %s", elegidos)
-    return elegidos or [m for m in preferidos if "2.0" not in m]
+    return elegidos
 
 
 def claude_respaldo(texto, sistema, timeout=120):

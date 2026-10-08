@@ -582,7 +582,7 @@ class Herramientas:
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]}]
         errores = []
         for prov, modelo in (("groq", "meta-llama/llama-4-scout-17b-16e-instruct"),
-                             ("gemini", "gemini-2.5-flash")):
+                             ("gemini", "gemini-flash-latest")):
             clave = config.clave(self.cfg, prov)
             if not clave:
                 continue

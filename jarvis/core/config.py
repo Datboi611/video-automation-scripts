@@ -20,7 +20,7 @@ DEFAULTS = {
     "llm": {
         "proveedores": [
             {"nombre": "groq", "api_key": "", "modelo": "meta-llama/llama-4-scout-17b-16e-instruct"},
-            {"nombre": "gemini", "api_key": "", "modelo": "gemini-2.5-flash"},
+            {"nombre": "gemini", "api_key": "", "modelo": "gemini-flash-latest"},
             {"nombre": "ollama", "modelo": "qwen2.5:3b", "url": "http://localhost:11434/v1"},
         ]
     },
@@ -62,14 +62,14 @@ URLS_PROVEEDOR = {
 
 ENV_KEYS = {"groq": "GROQ_API_KEY", "gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
 
-MODELO_INICIAL = {"claude": "claude-sonnet-5-5", "gemini": "gemini-2.5-flash", "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
+MODELO_INICIAL = {"claude": "claude-sonnet-5-5", "gemini": "gemini-flash-latest", "groq": "meta-llama/llama-4-scout-17b-16e-instruct"}
 
 # Modelos de respaldo dentro del mismo proveedor (si uno falla o se retira, prueba el siguiente)
 RESPALDO_MODELOS = {
     # ordenados por cupo diario gratis y velocidad (scout: 500K tokens/día; 70b: solo 100K/día)
     "groq": ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-120b",
              "openai/gpt-oss-20b", "moonshotai/kimi-k2-instruct", "llama-3.1-8b-instant"],
-    "gemini": ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"],
+    "gemini": ["gemini-flash-latest", "gemini-flash-lite-latest"],
 }
 
 
