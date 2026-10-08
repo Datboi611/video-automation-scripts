@@ -352,6 +352,7 @@ class Escucha:
                     self.on_estado("dormido")
                     origen = self._esperar_activacion()
                     log.info("Despertado por %s", origen)
+                    self._cortar.clear()
                     beep()
                     self._vaciar()
                     self.ultimo = time.time()
