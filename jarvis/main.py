@@ -453,7 +453,21 @@ class Jarvis:
             self.herramientas.pedir_dato("shopify", "Pega el Client ID y el Client secret (shpss_...)")
             return self.decir("Anotada la tienda. Me faltan el Client ID y el secret.")
         try:
-            self.decir(f"Shopify conectado, {self.cfg['tratamiento']}. {sh.ventas(1)}")
+            try:
+                resumen = sh.ventas(1)
+            except Exception as e:
+                if not (datos["client_id"] and datos["client_secret"]):
+                    raise
+                log.info("Client credentials no permitido (%s); uso autorización en el navegador", e)
+                self.ui("panel", "Shopify", [{"t": "Autorizar en el navegador", "tono": "info", "items": [
+                    {"x": "Pulse «Instalar / Install» en la pestaña que abrí", "sub": "Si sale 'redirect_uri is not whitelisted': "
+                     "agregue http://localhost:8788/shopify en Redirect URLs de la app y publique (Release)", "tags": []}]}])
+                self.decir("Le abrí Shopify en el navegador: apruebe el acceso y listo.")
+                datos["token"] = sh.autorizar()
+                self.cfg["shopify"] = datos
+                config.guardar_valor(["shopify"], datos)
+                resumen = sh.ventas(1)
+            self.decir(f"Shopify conectado, {self.cfg['tratamiento']}. {resumen}")
         except Exception as e:
             log.warning("Shopify: %s", e)
             self.ui("panel", "Shopify", [{"t": "No pude entrar", "tono": "warn", "items": [{"x": str(e)[:250], "sub": "", "tags": []}]}])

@@ -7,6 +7,9 @@ import requests
 
 log = logging.getLogger("jarvis")
 VERSION = "2025-07"
+PUERTO_OAUTH = 8788
+REDIRECCION = f"http://localhost:{PUERTO_OAUTH}/shopify"
+ALCANCES = "read_orders,read_products,read_inventory,read_customers"
 
 
 class Shopify:
@@ -26,6 +29,8 @@ class Shopify:
         """Apps del Dev Dashboard: token por 'client credentials' (dura ~24 h); se renueva solo."""
         if not (self.client_id and self.client_secret) or time.time() < self._vence:
             return
+        if self.token.startswith("shpat_"):
+            return  # token permanente ya obtenido
         r = requests.post(f"https://{self.tienda}/admin/oauth/access_token", timeout=20,
                           data={"grant_type": "client_credentials", "client_id": self.client_id,
                                 "client_secret": self.client_secret})
@@ -33,6 +38,45 @@ class Shopify:
         d = r.json()
         self.token = d["access_token"]
         self._vence = time.time() + int(d.get("expires_in", 86399)) - 300
+
+    def autorizar(self, timeout=300):
+        """Si 'client credentials' no está permitido (app de distribución personalizada), se usa el flujo
+        normal de Shopify: se abre el navegador, el dueño aprueba y se obtiene un token permanente (shpat_)."""
+        import http.server
+        import secrets
+        import urllib.parse
+        import webbrowser
+        estado, resultado = secrets.token_hex(8), {}
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
+                if q.get("state") == estado and q.get("code"):
+                    resultado["code"] = q["code"]
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("<h2>Listo. JARVIS ya tiene acceso a Shopify; puede cerrar esta pestaña.</h2>".encode())
+
+        srv = http.server.HTTPServer(("127.0.0.1", PUERTO_OAUTH), H)
+        srv.timeout = 2
+        webbrowser.open(f"https://{self.tienda}/admin/oauth/authorize?" + urllib.parse.urlencode({
+            "client_id": self.client_id, "scope": ALCANCES, "redirect_uri": REDIRECCION, "state": estado}))
+        fin = time.time() + timeout
+        while "code" not in resultado and time.time() < fin:
+            srv.handle_request()
+        srv.server_close()
+        if "code" not in resultado:
+            raise RuntimeError("No se aprobó el acceso en el navegador a tiempo.")
+        r = requests.post(f"https://{self.tienda}/admin/oauth/access_token", timeout=20, json={
+            "client_id": self.client_id, "client_secret": self.client_secret, "code": resultado["code"]})
+        r.raise_for_status()
+        self.token = r.json()["access_token"]
+        self._vence = float("inf")  # token permanente
+        return self.token
 
     def _gql(self, query, variables=None):
         self._renovar()
