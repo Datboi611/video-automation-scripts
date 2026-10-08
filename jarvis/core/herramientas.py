@@ -84,6 +84,8 @@ SPECS = [
      {"titulo": (S, "Título"), "secciones": ("array", "Lista de {titulo, puntos:[texto]}")}, ["titulo", "secciones"]),
     ("pedir_texto", "Abre una caja de texto para que el usuario ESCRIBA algo que no entendiste por voz (un enlace, código, nombre raro, tarea compleja).",
      {"motivo": (S, "Qué necesitas que escriba")}),
+    ("pillgo_videos", "Genera los 5 videos diarios de Pill&Go (daily.py con la fecha de mañana) en segundo plano y avisa al terminar.", {}),
+    ("pillgo_estado", "Estado de la generación de videos de Pill&Go en curso.", {}),
     ("diagnostico", "Revisa que todos los servicios funcionen (IA, Telegram, llamadas, voz, Todoist, Canvas, correo).", {}),
     ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
      {"que": (S, "pendientes | anuncios | notas | cursos")}, []),
@@ -145,7 +147,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"pillgo_videos", "pillgo_estado", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -201,6 +203,7 @@ class Herramientas:
         self.on_resultado = lambda nombre, args, resultado: None
         self.musica = None
         self.claude = None
+        self.pillgo = None
 
     def esquemas(self, solo=None):
         out = []
@@ -706,6 +709,12 @@ class Herramientas:
             self.ui("panel", titulo, sec)
         return "Mostrado en el panel."
 
+
+    def pillgo_videos(self):
+        return self.pillgo.iniciar()
+
+    def pillgo_estado(self):
+        return self.pillgo.resumen()
 
     def diagnostico(self):
         from . import diagnostico

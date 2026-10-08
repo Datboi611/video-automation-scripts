@@ -28,6 +28,7 @@ from core.claude_code import ClaudeCode
 from core.canvas import Canvas
 from core.presencia import Presencia, normalizar_mac
 from core.llamadas_vivo import LlamadasVivo
+from core.pillgo import PillGo
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -71,6 +72,7 @@ def respuesta_rapida(texto, idioma, cfg):
 
 
 PANEL = {  # herramienta -> título del menú lateral donde se muestra su resultado
+    "pillgo_estado": "Pill&Go",
     "canvas": "Canvas", "diagnostico": "Diagnóstico",
     "resumen_del_dia": "Tu día", "calendario": "Calendario", "todoist": "Todoist", "pendientes": "Pendientes",
     "listar_recordatorios": "Recordatorios", "correo": "Correo", "clima": "Clima", "info_sistema": "Sistema",
@@ -137,6 +139,11 @@ def accion_rapida(texto, herr, cfg):
         cuerpo = re.sub(r"^(de )?prueba$", "", m.group(1).strip()) or "Prueba de JARVIS ✅ Todo funciona, jefe."
         r = herr.ejecutar("notificar_telefono", {"mensaje": cuerpo[:1].upper() + cuerpo[1:]})
         return (f"Enviado a su iPhone, {j}." + acotacion("mensaje", cfg, herr)) if r.startswith(("Mensaje enviado", "Notificación")) else r
+    if re.search(r"\bvideos?\b", t) and re.search(r"p[ií]ll?\s*(and|&|y|en)?\s*go|pillgo|diarios", t):
+        if re.search(r"c[oó]mo va|estado|cu[aá]ntos|progreso|avance", t):
+            return herr.ejecutar("pillgo_estado", {})
+        if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):
+            return herr.ejecutar("pillgo_videos", {}) + acotacion("videos", cfg, herr, 0.5)
     if re.search(r"\b(revisa|checa|chequea|mira|lee|tengo|hay)\b.*\b(correo|correos|mail|mails|email|inbox|bandeja)\b", t):
         r = herr.ejecutar("correo", {"solo_no_leidos": True})
         if "no está conectado" in r:
@@ -257,6 +264,7 @@ class Jarvis:
         self.herramientas.ui = self.ui
         self.herramientas.claude = ClaudeCode(self.claude_termino)
         self.herramientas.al_conectar_canvas = self.canvas_conectado
+        self.herramientas.pillgo = PillGo(self.aviso_tarea, config.DATOS, c)
         self.herramientas.on_resultado = self.mostrar_resultado
         self.cerebro = Cerebro(c, self.herramientas, self.memoria, self.habilidades)
         self.recordatorios.iniciar()
@@ -348,6 +356,13 @@ class Jarvis:
             msg += f" Mientras no estaba hubo {len(pendientes)} novedades. La más reciente: {pendientes[-1]}"
         self.ui("setHint", "Te escucho siempre")
         self.decir(msg)
+
+    def aviso_tarea(self, texto, urgente=False):
+        """Avisos de tareas largas: Telegram + voz (si está en casa) + panel."""
+        if self.bot:
+            self.bot.enviar(texto)
+        self.ui("panel", "Pill&Go", paneles.desde_texto(texto))
+        self.avisar_por_voz(re.sub(r"[^\w\s,.:;¿?¡!/&()-]", "", texto.split("\n")[0]))
 
     def canvas_conectado(self, ok):
         t = self.cfg["tratamiento"]

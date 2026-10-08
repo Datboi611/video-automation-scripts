@@ -15,6 +15,11 @@ FRASES = {
         "Música para concentrarse. Veremos cuánto dura la concentración.",
         "Si esto no le inspira, nada lo hará.",
     ],
+    "videos": [
+        "Producción en marcha. El Óscar tendrá que esperar a mañana.",
+        "Cinco actores, cero quejas. Ojalá todos los equipos fueran así.",
+        "Le sugiero no tocar Flow mientras tanto; los artistas son sensibles.",
+    ],
     "pausa": ["Silencio restablecido. Casi había olvidado cómo sonaba.", "Pausado. El mundo agradece el respiro."],
     "llamada": [
         "Sí, le llamo a usted desde su propia casa. La tecnología es maravillosa.",

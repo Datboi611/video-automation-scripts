@@ -1,0 +1,155 @@
+"""TAREA: generar los 5 videos diarios de Pill&Go, siguiendo exactamente el procedimiento de Diego.
+
+1. PowerShell en C:\\Users\\Diego\\Documents\\Pillgo\\Pipeline
+2. py -u daily.py --date <mañana>   (el plan va un día adelantado)
+3. Esperar sin interrumpir (puede tardar horas); nunca abrir un segundo daily.py.
+4. Si no conecta con Flow / puerto 9222: py flow_runner.py launch, confirmar sesión y repetir el MISMO comando.
+5. Si se corta por error: repetir el MISMO comando (los que ya tienen FINAL.mp4 se saltan solos).
+6. Al terminar: contar videos en videos_diarios\\<fecha>\\FINALES y en G:\\Mi unidad\\Pillgo\\<fecha>\\FINALES y avisar.
+
+NUNCA: borrar out\\, FINALES ni Drive; editar Pillgo_Prompts.xlsx; ejecutar schedule.py install."""
+import collections
+import datetime as dt
+import glob
+import logging
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+
+log = logging.getLogger("jarvis")
+SIN_VENTANA = 0x08000000 if sys.platform == "win32" else 0
+
+PIPELINE = r"C:\Users\Diego\Documents\Pillgo\Pipeline"
+VIDEOS = r"C:\Users\Diego\Documents\Pillgo\videos_diarios"
+DRIVE = r"G:\Mi unidad\Pillgo"
+ESPERADOS = 5
+MAX_REINTENTOS = 6
+ERROR_FLOW = re.compile(r"no se pudo conectar a flow|9222|connect.*flow|ECONNREFUSED", re.I)
+
+
+class PillGo:
+    def __init__(self, avisar, carpeta_datos, cfg=None):
+        self.avisar = avisar  # función(texto, urgente=False) -> voz + Telegram
+        self.carpeta_datos = carpeta_datos
+        c = (cfg or {}).get("pillgo", {})
+        self.pipeline = c.get("pipeline", PIPELINE)
+        self.videos = c.get("videos", VIDEOS)
+        self.drive = c.get("drive", DRIVE)
+        self.hilo = None
+        self.fecha = None
+        self.ultimas = collections.deque(maxlen=12)
+        self.estado = "inactivo"
+        self.inicio = None
+
+    # ---------- utilidades ----------
+    @staticmethod
+    def _daily_corriendo():
+        try:
+            import psutil
+            for p in psutil.process_iter(["cmdline"]):
+                if any("daily.py" in (a or "") for a in (p.info["cmdline"] or [])):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _contar(self, base):
+        carpeta = os.path.join(base, self.fecha, "FINALES")
+        return len(glob.glob(os.path.join(carpeta, "*.mp4"))), carpeta
+
+    def _ps(self, comando, registro):
+        """Ejecuta en PowerShell dentro de la carpeta del Pipeline, guardando todo en el registro."""
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+               f"Set-Location '{self.pipeline}'; {comando}"]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                encoding="utf-8", errors="replace", creationflags=SIN_VENTANA)
+        hubo_error_flow = False
+        with open(registro, "a", encoding="utf-8") as f:
+            f.write(f"\n===== {dt.datetime.now():%H:%M:%S} > {comando}\n")
+            for linea in proc.stdout:
+                f.write(linea)
+                f.flush()
+                if linea.strip():
+                    self.ultimas.append(linea.strip()[:200])
+                if ERROR_FLOW.search(linea):
+                    hubo_error_flow = True
+        return proc.wait(), hubo_error_flow
+
+    # ---------- tarea ----------
+    def iniciar(self):
+        if self.hilo and self.hilo.is_alive():
+            return f"Ya estoy generando los videos del {self.fecha}. Le aviso al terminar."
+        if self._daily_corriendo():
+            return "Ya hay un daily.py corriendo en el PC; no abro otro, como usted indicó."
+        if not os.path.isdir(self.pipeline):
+            return f"No encuentro la carpeta {self.pipeline}."
+        self.fecha = (dt.date.today() + dt.timedelta(days=1)).isoformat()  # el plan va un día adelantado
+        self.hilo = threading.Thread(target=self._correr, daemon=True)
+        self.hilo.start()
+        return (f"Generando los 5 videos de Pill&Go para el {self.fecha}. Puede tardar varias horas; "
+                "no cierre el Brave de Flow. Le aviso al terminar.")
+
+    def _correr(self):
+        self.inicio = time.time()
+        self.estado = "generando"
+        registro = os.path.join(self.carpeta_datos, f"pillgo_{self.fecha}.log")
+        comando = f"py -u daily.py --date {self.fecha}"
+        errores = []
+        reintentos = 0
+        flow_lanzado = 0
+        while True:
+            codigo, error_flow = self._ps(comando, registro)
+            hechos, _ = self._contar(self.videos)
+            if hechos >= ESPERADOS and codigo == 0:
+                break
+            if error_flow and flow_lanzado < 2:
+                flow_lanzado += 1
+                self.estado = "abriendo Flow"
+                errores.append("Flow no estaba conectado (puerto 9222)")
+                # flow_runner deja Brave abierto: se lanza aparte, sin esperar a que termine
+                subprocess.Popen(["powershell", "-NoProfile", "-Command",
+                                  f"Set-Location '{self.pipeline}'; py flow_runner.py launch"],
+                                 creationflags=SIN_VENTANA)
+                self.avisar("Pill&Go: abrí Brave con Flow. Confirme que tenga la sesión iniciada; "
+                            "en 2 minutos vuelvo a lanzar los videos.", urgente=True)
+                time.sleep(120)
+                self.estado = "generando"
+                continue
+            if hechos >= ESPERADOS:
+                break
+            reintentos += 1
+            if reintentos > MAX_REINTENTOS:
+                errores.append(f"se cortó {reintentos} veces; me detuve para no insistir sin fin")
+                break
+            errores.append(f"se cortó (código {codigo}); repetí el mismo comando")
+            log.info("Pill&Go: reintento %s", reintentos)
+            time.sleep(15)
+        self._informe(errores, registro)
+
+    def _informe(self, errores, registro):
+        locales, carpeta = self._contar(self.videos)
+        try:
+            en_drive, _ = self._contar(self.drive)
+        except Exception:
+            en_drive = 0
+        horas = (time.time() - self.inicio) / 3600
+        self.estado = "terminado"
+        ok = locales >= ESPERADOS and en_drive >= ESPERADOS
+        texto = (f"🎬 Pill&Go {self.fecha}: {locales}/{ESPERADOS} videos en FINALES, {en_drive}/{ESPERADOS} copiados "
+                 f"a Drive ({horas:.1f} h).")
+        if errores:
+            texto += "\nIncidencias: " + "; ".join(dict.fromkeys(errores))
+        if not ok:
+            texto += f"\nRevise el registro: {registro}"
+        self.avisar(texto, urgente=not ok)
+
+    def resumen(self):
+        if self.estado == "inactivo":
+            return "No hay generación de videos en curso."
+        hechos = self._contar(self.videos)[0] if self.fecha else 0
+        mins = int((time.time() - self.inicio) / 60) if self.inicio else 0
+        ultimas = "\n".join(list(self.ultimas)[-4:])
+        return f"Pill&Go {self.fecha}: {self.estado}, {hechos}/{ESPERADOS} videos listos, {mins} min.\nÚltimo registro:\n{ultimas}"
