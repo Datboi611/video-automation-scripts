@@ -44,3 +44,31 @@ def restaurar():
         except Exception as e:
             log.debug("No pude restaurar el audio: %s", e)
         _guardados.clear()
+
+
+_cache = [0.0, False]
+
+
+def hay_audio():
+    """¿Suena algo en otra app (música)? Se consulta como mucho una vez por segundo."""
+    import time
+    if sys.platform != "win32":
+        return False
+    if time.time() - _cache[0] < 1:
+        return _cache[1]
+    sonando = False
+    try:
+        import comtypes
+        from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
+        comtypes.CoInitialize()
+        for s in AudioUtilities.GetAllSessions():
+            if not s.Process or s.Process.pid == os.getpid():
+                continue
+            medidor = s._ctl.QueryInterface(IAudioMeterInformation)
+            if medidor.GetPeakValue() > 0.01:
+                sonando = True
+                break
+    except Exception as e:
+        log.debug("No pude medir el audio: %s", e)
+    _cache[:] = [time.time(), sonando]
+    return sonando

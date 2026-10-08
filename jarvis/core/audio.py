@@ -68,7 +68,8 @@ class Escucha:
         self._eco_frames = 0
         self._previo = collections.deque(maxlen=25)
         self.cola = queue.Queue()
-        self._hist = collections.deque(maxlen=70)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
+        self.muteado = False  # botón de la interfaz: micrófono apagado
+        self._hist = collections.deque(maxlen=250)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
         self._pre = []
         self._rms_eco = collections.deque(maxlen=300)
         self._rms_reciente = collections.deque(maxlen=25)
@@ -95,7 +96,9 @@ class Escucha:
             return None
         try:
             frases = [self.palabra, "hey " + self.palabra, "oye " + self.palabra, "[unk]"]
-            return KaldiRecognizer(modelo, SR, json.dumps(frases))
+            rec = KaldiRecognizer(modelo, SR, json.dumps(frases))
+            rec.SetWords(True)  # da la confianza de cada palabra
+            return rec
         except Exception:
             log.exception("No pude crear el detector de palabra")
             return None
@@ -114,6 +117,8 @@ class Escucha:
 
     # --- interno ---
     def _callback(self, datos, frames, tiempo, estado):
+        if self.muteado:
+            return
         frame = datos[:, 0].copy()
         if (self.requiere and self.rec) or not self.silencio.is_set():
             # en modo «Jarvis», el micrófono sigue escuchando aunque JARVIS hable: decir «Jarvis» lo corta
@@ -159,7 +164,7 @@ class Escucha:
     def _conservar_frase(self):
         """Tras oír «Jarvis», lo que se dijo justo después ya está en el búfer: se reprocesa en vez de
         tirarlo (así funciona «Jarvis, pon mi playlist» de corrido)."""
-        self._pre = list(self._hist)[-60:]
+        self._pre = list(self._hist)[-200:]
         self._hist.clear()
 
     def _detecta_palabra(self, frame):
@@ -173,11 +178,16 @@ class Escucha:
         else:
             self._rms_eco.clear()
         self._rms_reciente.append(rms)
-        if self.rec.AcceptWaveform(frame.tobytes()):
-            texto, final = json.loads(self.rec.Result()).get("text", ""), True
-        else:
-            texto, final = json.loads(self.rec.PartialResult()).get("partial", ""), False
+        if not self.rec.AcceptWaveform(frame.tobytes()):
+            return False  # solo frases completas: los parciales confunden música y ruido con «Jarvis»
+        res = json.loads(self.rec.Result())
+        texto, final = res.get("text", ""), True
         if self.palabra not in texto:
+            return False
+        from . import atenuar
+        confianza = max([w.get("conf", 0) for w in res.get("result", []) if w.get("word") == self.palabra] or [1])
+        if confianza < (0.95 if atenuar.hay_audio() else 0.8):
+            log.debug("«Jarvis» descartado (confianza %.2f)", confianza)
             return False
         if hablando:
             # solo vale una frase completa y claramente más fuerte que el eco de su voz

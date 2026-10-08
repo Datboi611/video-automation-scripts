@@ -8,7 +8,7 @@ const COLORES = {
   hablando:   [60, 190, 255],
   dormido:    [20, 70, 140],
 };
-const TEXTOS = { reposo: "EN ESPERA", escuchando: "ESCUCHANDO", pensando: "PROCESANDO", hablando: "RESPONDIENDO", dormido: "EN REPOSO" };
+const TEXTOS = { reposo: "EN ESPERA", escuchando: "ESCUCHANDO", pensando: "PROCESANDO", hablando: "RESPONDIENDO", dormido: "ESPERANDO «JARVIS»" };
 
 let estado = "reposo", nivel = 0, nivelObj = 0, color = [...COLORES.reposo], giro = 0, velGiro = 0.004;
 const N = 900, puntos = [];
@@ -233,6 +233,12 @@ let campoPedido = null;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("chat").hidden = true; });
 $("p-play").addEventListener("click", () => J.musicaControl($("audio").paused ? "reanudar" : "pausar"));
 $("p-stop").addEventListener("click", () => J.musicaControl("detener"));
+$("mic").addEventListener("click", async () => {
+  if (!api()) return;
+  const muteado = await api().mutear();
+  $("mic").classList.toggle("off", !!muteado);
+  $("mic").title = muteado ? "Micrófono silenciado: toca para activarlo" : "Silenciar micrófono";
+});
 $("p-next").addEventListener("click", () => api() && api().musica("siguiente"));
 $("audio").addEventListener("ended", () => api() && api().musica("siguiente"));
 

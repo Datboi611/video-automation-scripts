@@ -869,6 +869,14 @@ class Api:
         if self._j.escucha:
             self._j.escucha.activar()
 
+    def mutear(self):
+        e = self._j.escucha
+        if not e:
+            return False
+        e.muteado = not e.muteado
+        self._j.ui("setStatus", "Micrófono silenciado" if e.muteado else "Diga «Jarvis» para hablar")
+        return e.muteado
+
     def detener(self):
         if getattr(self._j, "voz", None):
             self._j.voz.detener()
