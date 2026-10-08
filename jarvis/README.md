@@ -71,6 +71,10 @@ JARVIS te llama a tu celular como una llamada normal, con su voz. Twilio regala 
 3. Dile a JARVIS «configura las llamadas» y pega en la barra: Account SID, Auth Token, el número de Twilio y tu número. Te llamará de prueba.
 Si Twilio falla, usa CallMeBot (Telegram) como respaldo.
 
+## Hablar con JARVIS por teléfono (tiempo real)
+
+Llama al número de JARVIS desde tu celular y conversa con él; o cuando él te llame, sigue hablando después del aviso. JARVIS abre solo un túnel gratuito de Cloudflare para que Twilio llegue a tu PC y apunta tu número a él. Solo atiende llamadas de **tu** número y valida la firma de Twilio. Di «adiós» o «eso es todo» para colgar.
+
 ## Sabe si estás en casa
 
 Si tu iPhone está en el mismo WiFi que el PC, JARVIS habla; si sales (10 min sin verlo) se calla, deja de escuchar y te avisa todo por Telegram. Al volver te saluda y resume lo que pasó.

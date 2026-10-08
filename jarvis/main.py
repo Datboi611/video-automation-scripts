@@ -27,6 +27,7 @@ from core.vigilante import Vigilante
 from core.claude_code import ClaudeCode
 from core.canvas import Canvas
 from core.presencia import Presencia, normalizar_mac
+from core.llamadas_vivo import LlamadasVivo
 from core.memoria import Memoria
 from core.recordatorios import Recordatorios
 from core.telefono import Telefono
@@ -287,6 +288,10 @@ class Jarvis:
         # ¿estás en casa? (iPhone en el mismo WiFi) -> puede hablar; si no, silencio y todo por Telegram
         self.presencia = Presencia(c, self.salio_de_casa, self.volvio_a_casa)
         self.presencia.iniciar()
+        # hablar con JARVIS por teléfono en tiempo real (llamas al número de JARVIS o él te llama)
+        self.vivo = LlamadasVivo(self, config.DATOS)
+        self.telefono.vivo = self.vivo
+        self.vivo.iniciar()
 
         if not self.cerebro.proveedores:
             self.ui("pedirTexto", "Falta tu clave de Groq en config.json")
@@ -384,6 +389,8 @@ class Jarvis:
             c["telefono"][k] = v
             config.guardar_valor(["telefono", k], v)
         faltan = [k for k in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero") if not c["telefono"].get(k)]
+        if not faltan and getattr(self, "vivo", None) and not self.vivo.url:
+            self.vivo.iniciar()
         if faltan:
             self.herramientas.pedir_dato(faltan[0])
             return self.decir("Guardé lo de Twilio. Me falta un dato; lo pido en la barra.")

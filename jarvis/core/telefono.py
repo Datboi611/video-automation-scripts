@@ -32,6 +32,7 @@ class Telefono:
                 t[k] = normalizar_numero(t[k])
         self.cfg_tel = t
         self.solo_alerta = False
+        self.vivo = None  # LlamadasVivo: llamadas en las que se puede conversar
         self.servidor = t["ntfy_servidor"].rstrip("/")
         self.tema = t["ntfy_tema"].strip()
         self.telegram = t["telegram_usuario"].strip()
@@ -57,6 +58,13 @@ class Telefono:
 
     def llamar_twilio(self, mensaje):
         """Llamada telefónica REAL a tu número (contestas y escuchas a JARVIS)."""
+        if self.vivo and self.vivo.url and not self.solo_alerta:
+            try:  # con el túnel activo: JARVIS habla y luego puede conversar contigo
+                r = self.vivo.llamar_y_conversar(mensaje)
+                if r:
+                    return r
+            except Exception as e:
+                log.warning("Llamada conversacional falló, uso la normal: %s", e)
         from xml.sax.saxutils import escape
         t = self.cfg_tel
         voz = t.get("twilio_voz", "Polly.Andres-Neural")
