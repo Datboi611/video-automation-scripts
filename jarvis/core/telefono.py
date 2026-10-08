@@ -131,6 +131,25 @@ class Telefono:
             log.warning("Twilio rechazó un intento: %s", ultimo)
         raise RuntimeError(ultimo)
 
+    def llamar_a(self, numero, mensaje, nombre=""):
+        """Llama a un CONTACTO y le da un recado. Con el túnel activo, además escucha su respuesta."""
+        if not self.twilio_listo:
+            raise RuntimeError("Las llamadas con Twilio no están configuradas.")
+        numero = numero if numero.startswith("+") else normalizar_numero(numero)
+        if self.vivo and self.vivo.url:
+            return self.vivo.llamar_recado(numero, mensaje, nombre)
+        from xml.sax.saxutils import escape
+        t = self.cfg_tel
+        voz = t.get("twilio_voz", "Polly.Andres-Neural")
+        decir = f'<Say voice="{voz}" language="es-MX">{escape(mensaje[:900])}</Say>'
+        twiml = f'<Response><Pause length="1"/>{decir}<Pause length="1"/>{decir}</Response>'
+        r = requests.post(f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/Calls.json",
+                          auth=(t["twilio_sid"], t["twilio_token"]), timeout=20,
+                          data={"To": numero, "From": t["twilio_numero"], "Twiml": twiml})
+        if r.status_code >= 400:
+            raise RuntimeError(r.json().get("message", r.text[:200]))
+        return f"Llamando a {nombre or numero}."
+
     def llamar(self, mensaje):
         error_twilio = None
         if self.twilio_listo:

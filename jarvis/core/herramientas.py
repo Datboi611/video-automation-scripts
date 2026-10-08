@@ -140,6 +140,10 @@ SPECS = [
     ("recordar_dato", "Guarda un dato duradero del usuario.", {"dato": (S, "Dato")}),
     ("olvidar_dato", "Borra un dato de memoria.", {"texto": (S, "Texto")}),
     ("notificar_telefono", "Notificación push al teléfono.", {"mensaje": (S, "Mensaje")}),
+    ("llamar_contacto", "Llama por teléfono a un CONTACTO del usuario (mamá, Juan, etc.) y le da un recado con la voz de JARVIS; si responde, se lo pasa al usuario. Redacta el recado en 3ª persona, de parte del usuario.",
+     {"nombre": (S, "Nombre del contacto"), "mensaje": (S, "Recado completo que JARVIS dirá")}),
+    ("importar_contactos", "Importa los contactos del usuario desde un archivo .vcf (busca el más reciente en Descargas/Escritorio/Documentos).", {}),
+    ("guardar_contacto", "Guarda o actualiza un contacto (nombre y número con código de país).", {"nombre": (S, "Nombre"), "numero": (S, "Número")}),
     ("llamar_telefono", "Llama al celular del usuario y le dice un mensaje (número real con Twilio, o Telegram).", {"mensaje": (S, "Mensaje")}),
     ("mensaje_telegram", "Mensaje de Telegram al usuario.", {"mensaje": (S, "Mensaje")}),
     ("crear_habilidad", "Programa e instala una habilidad nueva en Python cuando no tengas herramienta para algo. El código define ejecutar(**kwargs) -> str.",
@@ -175,8 +179,9 @@ CATEGORIAS = {
             {"leer_pagina", "consultar_wikipedia", "clima", "abrir_web", "buscar_en_internet", "preguntar_a_claude"}),
     "shopify": (r"shopify|tienda|ezma|vend|venta|pedido|orden|stock|inventario|producto|cliente",
                 {"shopify_ventas", "shopify_pedidos", "shopify_inventario"}),
-    "telefono": (r"tel[eé]fono|celular|iphone|llam|notifica|telegram|avísame|avisame|phone|call|bot|casa|salgo|presencia",
-                 {"notificar_telefono", "llamar_telefono", "mensaje_telegram"}),
+    "telefono": (r"tel[eé]fono|celular|iphone|llam|contacto|recado|dile a|av[ií]sale|notifica|telegram|avísame|avisame|phone|call|bot|casa|salgo|presencia",
+                 {"notificar_telefono", "llamar_telefono", "mensaje_telegram", "llamar_contacto", "importar_contactos",
+                  "guardar_contacto"}),
     "memoria": (r"olvida|memoria|voz|habla m[aá]s|habilidad|aprende|forget|voice",
                 {"olvidar_dato", "cambiar_voz", "usar_habilidad", "crear_habilidad"}),
 }
@@ -482,6 +487,40 @@ class Herramientas:
             return (f"Su iPhone aún no está vinculado: envíe el código {bot.codigo} a su bot de Telegram "
                     "y vuelva a pedírmelo.")
         return "Su iPhone no está conectado. Dígame «conecta mi iPhone» para configurarlo."
+
+    @property
+    def contactos(self):
+        if not hasattr(self, "_contactos"):
+            from . import config
+            from .contactos import Contactos
+            self._contactos = Contactos(config.DATOS)
+        return self._contactos
+
+    def importar_contactos(self):
+        ruta, n = self.contactos.importar_auto()
+        if not ruta:
+            return ("No encontré ningún archivo .vcf en Descargas, Escritorio ni Documentos. Exporte sus contactos "
+                    "(iCloud.com > Contactos > seleccionar todo > Exportar vCard) y vuelva a pedírmelo.")
+        return f"Importé {n} contactos desde {os.path.basename(ruta)}. Ya puedo llamarlos."
+
+    def guardar_contacto(self, nombre, numero):
+        self.contactos.agregar(nombre, numero)
+        return f"Guardé a {nombre}."
+
+    def llamar_contacto(self, nombre, mensaje):
+        c = self.contactos.buscar(nombre)
+        if not c:
+            if not self.contactos.lista:
+                return "Aún no tengo sus contactos. Exporte un .vcf y dígame «importa mis contactos»."
+            return f"No encuentro a «{nombre}» en sus contactos."
+        jefe = self.cfg.get("nombre_usuario") or "mi jefe"
+        recado = f"Hola {c['nombre'].split()[0]}, le habla JARVIS, el asistente de {jefe}. {mensaje}"
+        try:
+            from .contactos import internacional
+            return self.telefono.llamar_a(internacional(c["numeros"][0]), recado, c["nombre"])
+        except Exception as e:
+            log.warning("Llamada a contacto falló: %s", e)
+            return f"No pude llamar a {c['nombre']}: {str(e)[:150]}"
 
     def llamar_telefono(self, mensaje):
         try:

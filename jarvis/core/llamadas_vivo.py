@@ -32,6 +32,7 @@ class LlamadasVivo:
         self.carpeta = carpeta
         self.url = None  # https://xxxx.trycloudflare.com
         self.pendientes = {}  # id -> respuesta (o None mientras piensa)
+        self.recados = {}  # id -> nombre del contacto al que se llamó
         self.carpeta_audio = os.path.join(carpeta, "audio_llamadas")
         os.makedirs(self.carpeta_audio, exist_ok=True)
 
@@ -188,11 +189,28 @@ class LlamadasVivo:
             log.warning("Petición de llamada rechazada (firma inválida): %s", ruta)
             return "<Response><Reject/></Response>"
         mio = self.t["mi_numero"]
-        if params.get("Direction", "").startswith("inbound") and params.get("From") != mio:
+        if params.get("Direction", "").startswith("inbound") and params.get("From") != mio and not ruta.startswith("/recado"):
             return "<Response><Reject/></Response>"  # solo su celular puede hablar con JARVIS
         ruta_base = ruta.split("?")[0]
         q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(ruta).query))
         jefe = self.j.cfg["tratamiento"]
+
+        if ruta_base == "/recado":  # llamada a un contacto: recado + escuchar su respuesta
+            msg = q.get("msg", "")
+            return (f'<Response><Pause length="1"/>{self._decir(msg)}'
+                    f'<Gather input="speech" language="es-MX" speechTimeout="auto" action="/recado/respuesta?id={q.get("id", "")}" '
+                    f'method="POST">{self._decir("Si quiere dejarle una respuesta, dígala ahora.")}</Gather>'
+                    f'{self._decir("Gracias. Hasta luego.")}</Response>')
+
+        if ruta_base == "/recado/respuesta":
+            texto = (params.get("SpeechResult") or "").strip()
+            nombre = self.recados.pop(q.get("id", ""), "el contacto")
+            if texto:
+                try:
+                    self.j.aviso_tarea(f"📞 Respuesta de {nombre}: «{texto}»")
+                except Exception:
+                    log.exception("Aviso de recado")
+            return f"<Response>{self._decir('Le paso su respuesta. Gracias, hasta luego.')}<Hangup/></Response>"
 
         if ruta_base == "/voz":  # inicio: llamada entrante o saliente de JARVIS
             saludo = q.get("msg") or f"¿Sí, {jefe}? Le escucho."
@@ -239,6 +257,19 @@ class LlamadasVivo:
             return f"<Response>{self._escuchar('Sigo trabajando en eso; se lo mando por Telegram al terminar. ¿Algo más?')}</Response>"
         aviso = self._decir("Un momento.") if intento == 0 else ""
         return f'<Response>{aviso}<Pause length="1"/><Redirect method="POST">/voz/espera?id={pid}&amp;n={intento + 1}</Redirect></Response>'
+
+    # ---------- llamada a un contacto con recado ----------
+    def llamar_recado(self, numero, mensaje, nombre=""):
+        t = self.t
+        rid = uuid.uuid4().hex[:8]
+        self.recados[rid] = nombre or numero
+        url = self.url + "/recado?" + urllib.parse.urlencode({"msg": mensaje, "id": rid})
+        r = requests.post(f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/Calls.json",
+                          auth=(t["twilio_sid"], t["twilio_token"]), timeout=20,
+                          data={"To": numero, "From": t["twilio_numero"], "Url": url})
+        if r.status_code >= 400:
+            raise RuntimeError(r.json().get("message", r.text[:200]))
+        return f"Llamando a {nombre or numero}; si responde algo, se lo paso."
 
     # ---------- llamada saliente conversacional ----------
     def llamar_y_conversar(self, mensaje):

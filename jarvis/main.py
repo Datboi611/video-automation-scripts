@@ -168,7 +168,9 @@ def accion_rapida(texto, herr, cfg):
             return herr.ejecutar("pillgo_estado", {})
         if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):
             return herr.ejecutar("pillgo_videos", {}) + acotacion("videos", cfg, herr, 0.5)
-    if re.search(r"\b(revisa|checa|chequea|mira|lee|tengo|hay)\b.*\b(correo|correos|mail|mails|email|inbox|bandeja)\b", t):
+    if re.search(r"(importa|carga|sube|actualiza|lee)\s+(mis |los )?contactos", t):
+        return herr.ejecutar("importar_contactos", {})
+    if re.search(r"(revisa|checa|chequea|mira|lee|tengo|hay)\b.*\b(correo|correos|mail|mails|email|inbox|bandeja)\b", t):
         r = herr.ejecutar("correo", {"solo_no_leidos": True})
         if "no está conectado" in r:
             return f"Su correo aún no está conectado, {j}. Escriba su dirección en la barra que le abrí."
