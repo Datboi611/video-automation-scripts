@@ -104,11 +104,20 @@ def accion_rapida(texto, herr, cfg):
             if r.startswith("No encontr"):
                 return None  # que lo resuelva la IA
         return f"Abriendo {destino}, {j}." + acotacion("abrir", cfg, herr)
-    m = (re.match(r"^(?:pon|ponme|reproduce|reproducir|play|abre)\s+(?:mi |la |el )?(?:playlist|lista)\s+(?:de\s+)?(.+?)"
-                  r"(?:\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music)?$", t)
-         or re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:mi |la )?(.+?)\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music$", t))
-    if m:
-        return herr.ejecutar("apple_music", {"busqueda": m.group(1).strip(" \"'“”")})
+    # playlists: SIEMPRE en Apple Music, salvo que pida otro sitio (YouTube, Spotify...)
+    lista = r"(?:pl[ae]y\s?list|pleilist|playlist|lista(?: de reproducci[oó]n)?)"
+    if not re.search(r"youtube|spotify|soundcloud", t):
+        m = (re.match(r"^(?:pon|ponme|pone|reproduce|reproducir|play|abre|toca)\s+(?:mi |la |el |una )?" + lista +
+                      r"\s+(?:de\s+|que se llama\s+|llamada\s+)?(.+?)(?:\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music)?"
+                      r"(?:\s+en aleatorio)?$", t)
+             or re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:mi |la )?(.+?)\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music$", t))
+        if not m:  # «pon General»: si es el nombre de una de sus playlists conocidas
+            m2 = re.match(r"^(?:pon|ponme|reproduce|play|toca)\s+(?:mi |la )?(.+?)(?:\s+en aleatorio)?$", t)
+            conocidas = {x.lower(): x for x in cfg.get("apple_playlists", [])}
+            if m2 and m2.group(1).strip() in conocidas:
+                m = m2
+        if m:
+            return herr.ejecutar("apple_music", {"busqueda": m.group(1).strip(" \"'“”")})
     m = re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:algo de |m[uú]sica de |la canci[oó]n |canciones de |m[uú]sica )?(.+)$", t)
     if m and herr.musica and not re.search(r"\b(alarma|recordatorio|timer|temporizador)\b", t):
         r = herr.ejecutar("poner_musica", {"busqueda": m.group(1), "varias": True})

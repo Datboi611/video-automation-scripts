@@ -120,7 +120,7 @@ SPECS = [
     ("poner_musica", "Pone música de YouTube en segundo plano dentro de JARVIS (sin abrir ventanas). varias=true para una mezcla/cola.",
      {"busqueda": (S, "Canción, artista o género"), "varias": ("boolean", "Varias canciones")}, ["busqueda"]),
     ("controlar_musica", "Controla la música de JARVIS.", {"accion": (S, "pausar/reanudar/siguiente/detener/volumen"), "nivel": ("integer", "Volumen 0-100")}, ["accion"]),
-    ("apple_music", "Reproduce una PLAYLIST del usuario en su app de Apple Music, por nombre (p. ej. 'General', 'Marvin Gaye').", {"busqueda": (S, "Nombre exacto de la playlist")}),
+    ("apple_music", "Reproduce una PLAYLIST del usuario en su app de Apple Music (SIEMPRE para playlists, salvo que pida YouTube/Spotify), por nombre (p. ej. 'General', 'Marvin Gaye').", {"busqueda": (S, "Nombre exacto de la playlist")}),
     ("controlar_multimedia", "Teclas multimedia de Windows (Spotify, Apple Music…).", {"accion": (S, "pausar/siguiente/anterior")}),
     ("escribir_texto", "Escribe texto en la ventana activa.", {"texto": (S, "Texto")}),
     ("presionar_teclas", "Pulsa teclas, p. ej. 'ctrl+c', 'win+d'.", {"teclas": (S, "Teclas con +")}),
@@ -677,6 +677,12 @@ class Herramientas:
         from .apple_music import reproducir_playlist
         r = reproducir_playlist(busqueda)
         self.apple_activa = r.startswith("Reproduciendo")
+        if self.apple_activa:  # recuerda el nombre para «pon <nombre>» sin decir «playlist»
+            conocidas = self.cfg.setdefault("apple_playlists", [])
+            if busqueda.lower() not in [x.lower() for x in conocidas]:
+                conocidas.append(busqueda)
+                from . import config
+                config.guardar_valor(["apple_playlists"], conocidas)
         if self.apple_activa and self.musica:
             try:
                 self.musica.controlar("pausar")  # que no suenen dos músicas a la vez

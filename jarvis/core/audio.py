@@ -68,6 +68,8 @@ class Escucha:
         self._eco_frames = 0
         self._previo = collections.deque(maxlen=25)
         self.cola = queue.Queue()
+        self._hist = collections.deque(maxlen=70)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
+        self._pre = []
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
         act = cfg["activacion"]
@@ -143,10 +145,20 @@ class Escucha:
             self.cola.get_nowait()
 
     def _leer(self, timeout=0.1):
+        if self._pre:
+            return self._pre.pop(0)
         try:
-            return self.cola.get(timeout=timeout)
+            frame = self.cola.get(timeout=timeout)
         except queue.Empty:
             return None
+        self._hist.append(frame)
+        return frame
+
+    def _conservar_frase(self):
+        """Tras oír «Jarvis», lo que se dijo justo después ya está en el búfer: se reprocesa en vez de
+        tirarlo (así funciona «Jarvis, pon mi playlist» de corrido)."""
+        self._pre = list(self._hist)[-60:]
+        self._hist.clear()
 
     def _detecta_palabra(self, frame):
         if not self.rec:
@@ -248,9 +260,9 @@ class Escucha:
                 origen = self._esperar_activacion()
                 log.info("Activado por %s", origen)
                 self._interrumpir_si_habla()
+                self._conservar_frase()
                 atenuar.bajar()
                 beep()  # solo un tono: así puede hablar de inmediato
-                self._vaciar()
                 espera = 8
                 while True:  # conversación: tras cada respuesta queda unos segundos escuchando
                     self.on_estado("escuchando")
@@ -262,8 +274,11 @@ class Escucha:
                     if self.rec:
                         self.rec.Reset()
                     if self._esperar_fin_respuesta():
+                        self._conservar_frase()
                         beep()
-                    self._vaciar()
+                    else:
+                        self._vaciar()
+                        self._hist.clear()
                     espera = 6
                 atenuar.restaurar()
                 if self.rec:
