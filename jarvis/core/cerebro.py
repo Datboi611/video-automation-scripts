@@ -85,6 +85,8 @@ class Cerebro:
             modelos = [p["modelo"]] + [m for m in config.RESPALDO_MODELOS.get(p["nombre"], []) if m != p["modelo"]]
             if p["nombre"] == "groq":
                 modelos = _modelos_disponibles(cliente, modelos)
+            elif p["nombre"] == "gemini":
+                modelos = _modelos_gemini(cliente, modelos)
             for m in modelos:
                 self.proveedores.append((p["nombre"], cliente, m))
 
@@ -217,6 +219,21 @@ def _modelos_disponibles(cliente, preferidos):
     elegidos = [m for m in dict.fromkeys(preferidos + extra) if m in activos]
     log.info("Modelos de Groq disponibles: %s", elegidos)
     return elegidos or preferidos
+
+
+def _modelos_gemini(cliente, preferidos):
+    """Google retira modelos (p. ej. gemini-2.0-flash): usa solo los 'flash' de texto que existan hoy."""
+    try:
+        activos = [m.id.split("/")[-1] for m in cliente.models.list().data]
+    except Exception as e:
+        log.warning("No pude listar modelos de Gemini: %s", e)
+        return [m for m in preferidos if "2.0" not in m]
+    malos = ("image", "tts", "live", "audio", "embedding", "preview", "exp", "thinking", "2.0", "1.5")
+    flash = sorted([m for m in activos if "flash" in m and not any(x in m for x in malos)], reverse=True)
+    elegidos = [m for m in preferidos if m in activos and "2.0" not in m] + flash
+    elegidos = list(dict.fromkeys(elegidos))[:4]
+    log.info("Modelos de Gemini disponibles: %s", elegidos)
+    return elegidos or [m for m in preferidos if "2.0" not in m]
 
 
 def claude_respaldo(texto, sistema, timeout=120):
