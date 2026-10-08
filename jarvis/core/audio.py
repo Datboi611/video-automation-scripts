@@ -70,6 +70,8 @@ class Escucha:
         self.cola = queue.Queue()
         self._hist = collections.deque(maxlen=70)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
         self._pre = []
+        self._rms_eco = collections.deque(maxlen=300)
+        self._rms_reciente = collections.deque(maxlen=25)
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
         act = cfg["activacion"]
@@ -163,14 +165,30 @@ class Escucha:
     def _detecta_palabra(self, frame):
         if not self.rec:
             return False
-        if self.rec.AcceptWaveform(frame.tobytes()):
-            texto = json.loads(self.rec.Result()).get("text", "")
+        x = frame.astype(np.float32) / 32768
+        rms = float(np.sqrt(np.mean(x * x)))
+        hablando = self.silencio.is_set()
+        if hablando:  # mientras JARVIS habla, el micro oye su propia voz: más exigente
+            self._rms_eco.append(rms)
         else:
-            texto = json.loads(self.rec.PartialResult()).get("partial", "")
-        if self.palabra in texto:
-            self.rec.Reset()
-            return True
-        return False
+            self._rms_eco.clear()
+        self._rms_reciente.append(rms)
+        if self.rec.AcceptWaveform(frame.tobytes()):
+            texto, final = json.loads(self.rec.Result()).get("text", ""), True
+        else:
+            texto, final = json.loads(self.rec.PartialResult()).get("partial", ""), False
+        if self.palabra not in texto:
+            return False
+        if hablando:
+            # solo vale una frase completa y claramente más fuerte que el eco de su voz
+            base = float(np.median(self._rms_eco)) if len(self._rms_eco) > 15 else 0.02
+            pico = max(self._rms_reciente) if self._rms_reciente else 0
+            if not final or pico < max(base * 2.5, 0.04):
+                if final:
+                    self.rec.Reset()
+                return False
+        self.rec.Reset()
+        return True
 
     def _esperar_activacion(self):
         while True:

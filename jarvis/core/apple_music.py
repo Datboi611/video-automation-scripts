@@ -19,15 +19,24 @@ def _norm(t):
 
 
 def _ventana(timeout=20):
+    """Ventana de Apple Music: primero la app de Microsoft (AppleMusic.exe); el reproductor web solo si no hay app."""
+    import psutil
     from pywinauto import Desktop
     fin = time.time() + timeout
     while time.time() < fin:
+        app, web = None, None
         for w in Desktop(backend="uia").windows():
             try:
-                if "apple music" in w.window_text().lower():
-                    return w
+                titulo = w.window_text().lower()
+                proc = psutil.Process(w.element_info.process_id).name().lower()
             except Exception:
-                pass
+                continue
+            if "applemusic" in proc or "apple music" in proc:
+                app = w
+            elif "apple music" in titulo and "jarvis" not in titulo:
+                web = web or w
+        if app or web:
+            return app or web
         time.sleep(0.5)
     return None
 
