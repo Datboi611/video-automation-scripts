@@ -19,3 +19,4 @@ yt-dlp
 ddgs
 beautifulsoup4
 playwright
+pywinauto; sys_platform == "win32"

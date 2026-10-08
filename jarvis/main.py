@@ -104,17 +104,24 @@ def accion_rapida(texto, herr, cfg):
             if r.startswith("No encontr"):
                 return None  # que lo resuelva la IA
         return f"Abriendo {destino}, {j}." + acotacion("abrir", cfg, herr)
+    m = (re.match(r"^(?:pon|ponme|reproduce|reproducir|play|abre)\s+(?:mi |la |el )?(?:playlist|lista)\s+(?:de\s+)?(.+?)"
+                  r"(?:\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music)?$", t)
+         or re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:mi |la )?(.+?)\s+(?:en|de|desde)\s+(?:mi\s+)?apple\s*music$", t))
+    if m:
+        return herr.ejecutar("apple_music", {"busqueda": m.group(1).strip(" \"'“”")})
     m = re.match(r"^(?:pon|ponme|reproduce|play)\s+(?:algo de |m[uú]sica de |la canci[oó]n |canciones de |m[uú]sica )?(.+)$", t)
     if m and herr.musica and not re.search(r"\b(alarma|recordatorio|timer|temporizador)\b", t):
         r = herr.ejecutar("poner_musica", {"busqueda": m.group(1), "varias": True})
         return r if r.startswith("No") else f"Enseguida, {j}. {r}" + acotacion("musica", cfg, herr)
     if re.fullmatch(r"(pausa|pausar|pausa la m[uú]sica|para la m[uú]sica|det[eé]n la m[uú]sica|stop|silencio)", t):
-        herr.ejecutar("controlar_musica", {"accion": "pausar"})
+        herr.ejecutar("controlar_multimedia" if getattr(herr, "apple_activa", False) else "controlar_musica", {"accion": "pausar"})
         return "Hecho." + acotacion("pausa", cfg, herr)
     if re.fullmatch(r"(contin[uú]a|reanuda|sigue)( la m[uú]sica)?|play", t):
-        herr.ejecutar("controlar_musica", {"accion": "reanudar"})
+        herr.ejecutar("controlar_multimedia" if getattr(herr, "apple_activa", False) else "controlar_musica", {"accion": "reanudar"})
         return "Reanudando."
     if re.fullmatch(r"(siguiente|la siguiente|siguiente canci[oó]n|next|cambia de canci[oó]n|otra canci[oó]n)", t):
+        if getattr(herr, "apple_activa", False):
+            return herr.ejecutar("controlar_multimedia", {"accion": "siguiente"})
         return herr.ejecutar("controlar_musica", {"accion": "siguiente"})
     # llamadas y mensajes al teléfono: directo, sin depender de la IA
     t = re.sub(r"^(?:haz|has|realiza|hazme|inicia)\s+(?:la|una)\s+llamada(?:\s+ahora)?", "llámame", t)

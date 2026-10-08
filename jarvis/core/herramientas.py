@@ -119,7 +119,7 @@ SPECS = [
     ("poner_musica", "Pone música de YouTube en segundo plano dentro de JARVIS (sin abrir ventanas). varias=true para una mezcla/cola.",
      {"busqueda": (S, "Canción, artista o género"), "varias": ("boolean", "Varias canciones")}, ["busqueda"]),
     ("controlar_musica", "Controla la música de JARVIS.", {"accion": (S, "pausar/reanudar/siguiente/detener/volumen"), "nivel": ("integer", "Volumen 0-100")}, ["accion"]),
-    ("apple_music", "Busca en Apple Music (se abre aparte).", {"busqueda": (S, "Qué buscar")}),
+    ("apple_music", "Reproduce una PLAYLIST del usuario en su app de Apple Music, por nombre (p. ej. 'General', 'Marvin Gaye').", {"busqueda": (S, "Nombre exacto de la playlist")}),
     ("controlar_multimedia", "Teclas multimedia de Windows (Spotify, Apple Music…).", {"accion": (S, "pausar/siguiente/anterior")}),
     ("escribir_texto", "Escribe texto en la ventana activa.", {"texto": (S, "Texto")}),
     ("presionar_teclas", "Pulsa teclas, p. ej. 'ctrl+c', 'win+d'.", {"teclas": (S, "Teclas con +")}),
@@ -673,7 +673,15 @@ class Herramientas:
         return self.musica.control(accion, nivel)
 
     def apple_music(self, busqueda):
-        return self.musica.apple_music(busqueda)
+        from .apple_music import reproducir_playlist
+        r = reproducir_playlist(busqueda)
+        self.apple_activa = r.startswith("Reproduciendo")
+        if self.apple_activa and self.musica:
+            try:
+                self.musica.controlar("pausar")  # que no suenen dos músicas a la vez
+            except Exception:
+                pass
+        return r
 
     # ---------- Investigación web ----------
     def investigar_web(self, consulta, paginas=3):
