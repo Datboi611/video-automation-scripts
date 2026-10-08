@@ -22,8 +22,8 @@ import requests
 log = logging.getLogger("jarvis")
 SIN_VENTANA = 0x08000000 if sys.platform == "win32" else 0
 PUERTO = 8787
-DESPEDIDAS = re.compile(r"\b(adi[oó]s|chao|chau|eso es todo|nada m[aá]s|cuelga|hasta luego|ya est[aá]|es todo)\b"
-                        r"|^\W*(no|nop|nope|nada|no gracias|no,? gracias|gracias|listo|ya|ok|est[aá] bien|perfecto)\W*$", re.I)
+DESPEDIDAS = re.compile(r"\b(adi[oó]s|chao|chau|eso es todo|nada m[aá]s|cuelga|hasta luego|ya est[aá]|es todo|bye|goodbye|that.?s all|hang up)\b"
+                        r"|^\W*(no|nop|nope|nada|no gracias|no,? gracias|gracias|listo|ya|ok|est[aá] bien|perfecto|no thanks|thanks|nothing|okay)\W*$", re.I)
 
 
 class LlamadasVivo:
@@ -162,6 +162,8 @@ class LlamadasVivo:
                 return f"<Play>{self.url}/audio/{nombre}.mp3</Play>"
             except Exception as e:
                 log.warning("Voz de ElevenLabs en llamada no disponible: %s", e)
+        if self.j.cfg.get("idioma") == "en":
+            return f'<Say voice="Polly.Brian-Neural" language="en-GB">{escape(texto[:1500])}</Say>'
         return f'<Say voice="{self._voz()}" language="es-MX">{escape(texto[:1500])}</Say>'
 
     def _limpiar_audios(self):
@@ -175,7 +177,7 @@ class LlamadasVivo:
                     pass
 
     def _escuchar(self, texto=""):
-        return (f'<Gather input="speech" language="es-MX" speechTimeout="auto" speechModel="phone_call" '
+        return (f'<Gather input="speech" language="{'en-GB' if self.j.cfg.get('idioma') == 'en' else 'es-MX'}" speechTimeout="auto" speechModel="phone_call" '
                 f'action="/voz/respuesta" method="POST" actionOnEmptyResult="true">{self._decir(texto) if texto else ""}'
                 f'</Gather><Redirect method="POST">/voz/respuesta</Redirect>')
 

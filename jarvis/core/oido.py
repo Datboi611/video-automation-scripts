@@ -59,6 +59,10 @@ class Oido:
             from openai import OpenAI
             self._groq = OpenAI(api_key=self.key_groq, base_url=config.URLS_PROVEEDOR["groq"], timeout=20)
         wav = _wav(audio)
+        if self.cfg.get("idioma", "es") == "en":
+            r = self._groq.audio.transcriptions.create(
+                model="whisper-large-v3", file=("voz.wav", wav), language="en", prompt=VOCABULARIO, temperature=0)
+            return r.text, "en"
         if self.cfg.get("idioma", "es") == "es":
             r = self._groq.audio.transcriptions.create(
                 model="whisper-large-v3", file=("voz.wav", wav), language="es", prompt=VOCABULARIO, temperature=0)
@@ -80,7 +84,11 @@ class Oido:
             from faster_whisper import WhisperModel
             self._local = WhisperModel(self.cfg["stt"]["modelo_local"], device="cpu", compute_type="int8")
         x = audio.astype(np.float32) / 32768
-        if self.cfg.get("idioma", "es") == "es":
+        if self.cfg.get("idioma", "es") in ("es", "en"):
+            fijo = self.cfg.get("idioma", "es")
+            segs, _ = self._local.transcribe(x, beam_size=3, language=fijo, initial_prompt=VOCABULARIO, vad_filter=True)
+            return " ".join(s.text for s in segs), fijo
+        if False:
             segs, _ = self._local.transcribe(x, beam_size=3, language="es", initial_prompt=VOCABULARIO, vad_filter=True)
             return " ".join(s.text for s in segs), "es"
         segs, info = self._local.transcribe(x, beam_size=3, initial_prompt=VOCABULARIO, vad_filter=True)

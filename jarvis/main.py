@@ -140,6 +140,8 @@ def accion_rapida(texto, herr, cfg):
         cuerpo = re.sub(r"^(de )?prueba$", "", m.group(1).strip()) or "Prueba de JARVIS ✅ Todo funciona, jefe."
         r = herr.ejecutar("notificar_telefono", {"mensaje": cuerpo[:1].upper() + cuerpo[1:]})
         return (f"Enviado a su iPhone, {j}." + acotacion("mensaje", cfg, herr)) if r.startswith(("Mensaje enviado", "Notificación")) else r
+    if re.search(r"\b(ads|anuncios|adds)\b", t) and re.search(r"\b(haz|has|hazme|genera|crea|ejecuta|corre|lanza|make|run|generate|create|do|start)\b", t):
+        t = "genera los videos de pillgo"
     if re.search(r"\bvideos?\b", t) and re.search(r"p[ií]ll?\s*(and|&|y|en)?\s*go|pillgo|diarios", t):
         if re.search(r"c[oó]mo va|estado|cu[aá]ntos|progreso|avance", t):
             return herr.ejecutar("pillgo_estado", {})
@@ -600,6 +602,17 @@ class Jarvis:
         """Cada pedido es un proceso independiente: pueden correr varios a la vez."""
         if self.escucha:
             self.escucha.actividad()
+        if self.cfg.get("idioma") == "en":
+            idioma = "en"
+        cambio = re.search(r"\b(?:habla(?:me)?|responde|speak|talk)\s+(?:en|in)\s+(ingl[eé]s|english|espa[nñ]ol|spanish)\b", texto, re.I)
+        if cambio:
+            nuevo = "en" if cambio.group(1).lower().startswith(("ingl", "engl")) else "es"
+            self.cfg["idioma"] = nuevo
+            config.guardar_valor(["idioma"], nuevo)
+            r = "Very well, sir. English it is." if nuevo == "en" else "Entendido, jefe. Volvemos al español."
+            if hablar:
+                self.decir(r, nuevo)
+            return r
         tw = datos_twilio(texto)
         if tw and len(tw) > 1:
             self.guardar_twilio(tw)
@@ -706,8 +719,8 @@ class Jarvis:
     def comando_de_voz(self, audio):
         self.estado("pensando")
         texto, idioma = self.oido.transcribir(audio)
-        if self.cfg.get("idioma", "es") == "es":
-            idioma = "es"
+        if self.cfg.get("idioma", "es") in ("es", "en"):
+            idioma = self.cfg["idioma"]
         if not texto:
             self.estado("escuchando")
             return False

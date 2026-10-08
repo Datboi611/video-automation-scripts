@@ -95,7 +95,9 @@ class Cerebro:
             dia=DIAS[ahora.weekday()], fecha=ahora.strftime("%d/%m/%Y"), hora=ahora.strftime("%H:%M"),
             memoria=self.memoria.texto(), habilidades=self.habilidades.texto() if self.habilidades else "(ninguna)",
             idioma_regla=("Responde SIEMPRE en español." if self.cfg.get("idioma", "es") == "es"
-                          else "Responde en el idioma en que te hablen (español o inglés)."),
+                          else "IMPORTANT: answer ALWAYS in British English, as a refined British butler (JARVIS). "
+                               "Address the user as 'sir', never 'jefe'. Keep the same personality and rules."
+                          if self.cfg.get("idioma") == "en" else "Responde en el idioma en que te hablen (español o inglés)."),
         )
 
     def responder(self, texto, on_herramienta=lambda n: None, idioma="es"):
@@ -110,7 +112,10 @@ class Cerebro:
         # solo las herramientas relevantes (+ las del turno anterior, para respuestas como "sí, hazlo")
         self._solo = herramientas_para(texto, self._previas)
         self._previas = herramientas_para(texto)
-        for nombre, cliente, modelo in self.proveedores:
+        agotados = getattr(self, "_agotados", {})
+        self._agotados = agotados
+        vivos = [x for x in self.proveedores if agotados.get(x[2], 0) < time.time()] or self.proveedores
+        for nombre, cliente, modelo in vivos:
             try:
                 respuesta = self._bucle(cliente, modelo, mensajes, on_herramienta)
                 self.historial += [{"role": "user", "content": texto}, {"role": "assistant", "content": respuesta}]
@@ -119,6 +124,9 @@ class Cerebro:
                 espera = _segundos_reintento(e)
                 log.warning("Proveedor %s (%s) falló: %s", nombre, modelo, e)
                 self.ultimo_motivo = f"{nombre}/{modelo}: {str(e)[:220]}"
+                if "per day" in str(e) or "TPD" in str(e) or "RPD" in str(e):
+                    agotados[modelo] = time.time() + 3 * 3600  # cupo diario agotado: no lo vuelvo a probar en 3 h
+                    continue
                 if espera and espera <= 4:  # límite por minuto con espera corta: reintenta el mismo
                     time.sleep(espera)
                     try:
@@ -128,7 +136,7 @@ class Cerebro:
                     except Exception as e2:
                         log.warning("Reintento falló: %s", e2)
         # último recurso: responder sin herramientas para no quedarse mudo
-        for nombre, cliente, modelo in self.proveedores[:3]:
+        for nombre, cliente, modelo in [x for x in self.proveedores if agotados.get(x[2], 0) < time.time()][:3]:
             try:
                 r = cliente.chat.completions.create(model=modelo, messages=mensajes[:1] + mensajes[-1:],
                                                     temperature=0.6, max_tokens=300)

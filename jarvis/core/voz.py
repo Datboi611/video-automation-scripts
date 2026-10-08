@@ -39,6 +39,7 @@ def frases(texto):
 class Voz:
     def __init__(self, cfg, carpeta, on_nivel=lambda v: None):
         self.cfg = cfg["voz"]
+        self.raiz = cfg
         self.carpeta = os.path.join(carpeta, "tts")
         os.makedirs(self.carpeta, exist_ok=True)
         self.on_nivel = on_nivel
@@ -57,6 +58,8 @@ class Voz:
         texto = limpiar(texto)
         if not texto:
             return
+        if self.idioma_fijo() == "en":
+            idioma = "en"
         self._parar.clear()
         self.hablando = True
         try:
@@ -87,6 +90,9 @@ class Voz:
             self.hablando = False
             self.on_nivel(0)
 
+    def idioma_fijo(self):
+        return self.raiz.get("idioma", "es")
+
     def archivo(self, texto):
         """Genera un mp3 con la voz de JARVIS (para notas de voz por Telegram)."""
         texto = limpiar(texto)
@@ -95,7 +101,7 @@ class Voz:
                 return self._generar_11(texto)
             except Exception:
                 pass
-        return self._generar(texto, self.cfg["voz"])
+        return self._generar(texto, self.cfg.get("voz_en") if self.idioma_fijo() == "en" else self.cfg["voz"])
 
     # ---------- edge-tts por frases ----------
     def _generar(self, texto, voz):

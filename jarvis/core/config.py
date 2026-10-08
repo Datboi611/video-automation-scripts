@@ -86,18 +86,26 @@ def _merge(base, extra):
 def _migrar(usuario, ruta):
     """Actualiza un config.json viejo a los nuevos valores por defecto."""
     v = usuario.get("_version", 1)
-    if v >= 5:
+    if v >= 6:
+        return
+    if v == 5:
+        _a_v6(usuario)
+        usuario["_version"] = 6
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 4:
         _a_v5(usuario)
-        usuario["_version"] = 5
+        _a_v6(usuario)
+        usuario["_version"] = 6
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 3:
         _a_v4(usuario)
         _a_v5(usuario)
-        usuario["_version"] = 5
+        _a_v6(usuario)
+        usuario["_version"] = 6
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
@@ -115,7 +123,8 @@ def _migrar(usuario, ruta):
     usuario.setdefault("agenda", {"google_calendar_ics": "", "todoist_token": ""})
     _a_v4(usuario)
     _a_v5(usuario)
-    usuario["_version"] = 5
+    _a_v6(usuario)
+    usuario["_version"] = 6
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
 
@@ -144,6 +153,14 @@ def _a_v5(usuario):
         voz["velocidad"] = "+0%"
     voz.setdefault("elevenlabs_api_key", "")
     voz.setdefault("elevenlabs_voz", "JBFqnCBsd6RMkjVDRZzb")
+
+
+def _a_v6(usuario):
+    """v6: ElevenLabs sin cupo -> JARVIS en inglés con voz británica gratis (Ryan)."""
+    usuario["idioma"] = "en"
+    voz = usuario.setdefault("voz", {})
+    voz["motor"] = "edge"
+    voz["voz_en"] = "en-GB-RyanNeural"
 
 
 def cargar():
