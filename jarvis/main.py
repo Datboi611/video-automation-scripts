@@ -250,6 +250,8 @@ class Jarvis:
         self.telefono = Telefono(c)
         self.recordatorios = Recordatorios(os.path.join(config.DATOS, "recordatorios.json"), self.recordatorio_vencido)
         self.voz = Voz(c, config.DATOS, on_nivel=self.nivel)
+        self.voz.on_aviso = lambda t: self.ui("panel", "Voz", [{"t": "Aviso", "tono": "warn",
+                                                               "items": [{"x": t, "sub": "", "tags": []}]}])
         agenda = {
             "calendario": Calendario(c["agenda"]["google_calendar_ics"]),
             "todoist": Todoist(c["agenda"]["todoist_token"]),

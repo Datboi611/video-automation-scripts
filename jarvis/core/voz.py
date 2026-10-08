@@ -42,6 +42,7 @@ class Voz:
         self.carpeta = os.path.join(carpeta, "tts")
         os.makedirs(self.carpeta, exist_ok=True)
         self.on_nivel = on_nivel
+        self.on_aviso = lambda texto: None
         self._parar = threading.Event()
         self._mixer = False
         self.hablando = False
@@ -64,6 +65,15 @@ class Voz:
                     return self._por_frases(texto, self._generar_11)
                 except Exception as e:  # sin cuota o sin internet: pasa a la voz gratis
                     log.warning("ElevenLabs falló, uso edge-tts: %s", e)
+                    if not getattr(self, "_avisado_11", False):
+                        self._avisado_11 = True
+                        txt = str(e)
+                        motivo = ("se acabó el cupo gratis de este mes" if any(x in txt for x in ("401", "quota", "402", "429"))
+                                  else "no respondió")
+                        try:
+                            self.on_aviso(f"La voz de George (ElevenLabs) {motivo}; uso la voz gratis mientras tanto.")
+                        except Exception:
+                            pass
             if self.cfg["motor"] in ("edge", "elevenlabs"):
                 elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
                 respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-ES-AlvaroNeural"

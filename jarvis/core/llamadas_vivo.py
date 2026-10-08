@@ -32,6 +32,8 @@ class LlamadasVivo:
         self.carpeta = carpeta
         self.url = None  # https://xxxx.trycloudflare.com
         self.pendientes = {}  # id -> respuesta (o None mientras piensa)
+        self.carpeta_audio = os.path.join(carpeta, "audio_llamadas")
+        os.makedirs(self.carpeta_audio, exist_ok=True)
 
     @property
     def t(self):
@@ -50,6 +52,21 @@ class LlamadasVivo:
         class Manejador(http.server.BaseHTTPRequestHandler):
             def log_message(self, *a):
                 pass
+
+            def do_GET(self):  # audios de JARVIS (voz de ElevenLabs) que Twilio reproduce en la llamada
+                m = re.fullmatch(r"/audio/([a-f0-9]{32})\.mp3", self.path)
+                ruta = os.path.join(dueno.carpeta_audio, m.group(1) + ".mp3") if m else ""
+                if not ruta or not os.path.exists(ruta):
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                with open(ruta, "rb") as f:
+                    datos = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(datos)))
+                self.end_headers()
+                self.wfile.write(datos)
 
             def do_POST(self):
                 largo = int(self.headers.get("Content-Length", 0) or 0)
@@ -134,7 +151,28 @@ class LlamadasVivo:
         return self.t.get("twilio_voz", "Polly.Andres-Neural")
 
     def _decir(self, texto):
+        """Con ElevenLabs configurado, la llamada usa la misma voz de JARVIS (George); si no, la de Twilio."""
+        voz = self.j.cfg.get("voz", {})
+        if self.url and voz.get("elevenlabs_api_key"):
+            try:
+                ruta = self.j.voz._generar_11(texto[:900])
+                nombre = uuid.uuid4().hex
+                os.replace(ruta, os.path.join(self.carpeta_audio, nombre + ".mp3"))
+                self._limpiar_audios()
+                return f"<Play>{self.url}/audio/{nombre}.mp3</Play>"
+            except Exception as e:
+                log.warning("Voz de ElevenLabs en llamada no disponible: %s", e)
         return f'<Say voice="{self._voz()}" language="es-MX">{escape(texto[:1500])}</Say>'
+
+    def _limpiar_audios(self):
+        limite = time.time() - 3600
+        for f in os.listdir(self.carpeta_audio):
+            ruta = os.path.join(self.carpeta_audio, f)
+            if os.path.getmtime(ruta) < limite:
+                try:
+                    os.remove(ruta)
+                except OSError:
+                    pass
 
     def _escuchar(self, texto=""):
         return (f'<Gather input="speech" language="es-MX" speechTimeout="auto" speechModel="phone_call" '
