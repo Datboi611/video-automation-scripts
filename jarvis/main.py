@@ -879,6 +879,14 @@ class Api:
         self._j.ui("setStatus", "Micrófono silenciado" if e.muteado else "Diga «Jarvis» para hablar")
         return e.muteado
 
+    def reposo(self):
+        """Botón ☾: calla a JARVIS, termina la conversación y vuelve a esperar «Jarvis»."""
+        if getattr(self._j, "voz", None):
+            self._j.voz.detener()
+        if self._j.escucha:
+            self._j.escucha.reposo()
+        self._j.ui("setStatus", "En reposo · diga «Jarvis»")
+
     def detener(self):
         if getattr(self._j, "voz", None):
             self._j.voz.detener()

@@ -76,6 +76,7 @@ class Escucha:
         self._parciales = 0
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
+        self._cortar = threading.Event()
         act = cfg["activacion"]
         self.aplausos = DetectorAplausos(act["umbral_aplauso"]) if act["aplausos"] else None
         self.palabra = act["palabra"].lower().strip()
@@ -233,6 +234,14 @@ class Escucha:
 
     def dormir(self):
         self.ultimo = 0
+        self._cortar.set()
+
+    def reposo(self):
+        """Termina la conversación en curso: vuelve a esperar «Jarvis» y restaura el volumen de la música."""
+        self.silencio.clear()
+        self._cortar.set()
+        from . import atenuar
+        atenuar.restaurar()
 
     def _grabar(self, espera_max):
         """Graba una frase (termina tras ~1.6 s de silencio, configurable). None si nadie habla."""
@@ -240,6 +249,8 @@ class Escucha:
         fin_silencio = int(self.cfg.get("segundos_silencio", 1.6) / 0.03)
         while True:
             self._manual.clear()
+            if self._cortar.is_set():
+                return None
             frame = self._leer()
             if frame is None:
                 if time.time() - inicio > espera_max:
@@ -279,11 +290,11 @@ class Escucha:
     def _esperar_fin_respuesta(self):
         """Espera a que JARVIS termine de responder; si el usuario dice «Jarvis», lo corta. True = lo llamaron."""
         inicio = time.time()
-        while time.time() - inicio < 15 and not self.silencio.is_set():  # aún pensando
+        while time.time() - inicio < 15 and not self.silencio.is_set() and not self._cortar.is_set():  # aún pensando
             frame = self._leer()
             if frame is not None and self._detecta_palabra(frame):
                 return True
-        while self.silencio.is_set():  # hablando
+        while self.silencio.is_set() and not self._cortar.is_set():  # hablando
             frame = self._leer()
             if frame is not None and self._detecta_palabra(frame):
                 self._interrumpir_si_habla()
@@ -295,8 +306,10 @@ class Escucha:
         while True:
             try:
                 self.on_estado("dormido")
+                self._cortar.clear()
                 origen = self._esperar_activacion()
                 log.info("Activado por %s", origen)
+                self._cortar.clear()
                 self._interrumpir_si_habla()
                 self._conservar_frase()
                 atenuar.bajar()

@@ -239,6 +239,7 @@ $("mic").addEventListener("click", async () => {
   $("mic").classList.toggle("off", !!muteado);
   $("mic").title = muteado ? "Micrófono silenciado: toca para activarlo" : "Silenciar micrófono";
 });
+$("reposo").addEventListener("click", () => api() && api().reposo());
 $("p-next").addEventListener("click", () => api() && api().musica("siguiente"));
 $("audio").addEventListener("ended", () => api() && api().musica("siguiente"));
 

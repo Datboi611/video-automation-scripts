@@ -127,6 +127,8 @@ body { grid-template-rows: auto 1fr; }
 
 #log, #log[hidden] { display: none !important; }
 
-.mic { position: fixed; right: 28px; bottom: 26px; z-index: 3; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--linea); background: var(--panel); font-size: 20px; cursor: pointer; }
-.mic.off { background: #5a1520; border-color: #ff4d6a; filter: grayscale(0.2); }
-.mic.off::after { content: ""; position: absolute; left: 10px; right: 10px; top: 50%; height: 2px; background: #ff4d6a; transform: rotate(-45deg); }
+.controles { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 10px; }
+.ctl { position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--linea); background: var(--panel); color: inherit; font-size: 19px; cursor: pointer; }
+.ctl:hover { box-shadow: 0 0 14px rgba(31, 168, 255, .45); }
+.ctl.off { background: #5a1520; border-color: #ff4d6a; }
+.ctl.off::after { content: ""; position: absolute; left: 9px; right: 9px; top: 50%; height: 2px; background: #ff4d6a; transform: rotate(-45deg); }
