@@ -78,8 +78,53 @@ class PillGo:
                     hubo_error_flow = True
         return proc.wait(), hubo_error_flow
 
+    # ---------- lanzar.py (tanda desvinculada + vigía con avisos por Telegram) ----------
+    def _lanzador(self):
+        """Ruta de lanzar.py junto a daily.py; si no existe, se copia el de JARVIS (extras/lanzar.py)."""
+        import shutil
+        for d in (self.pipeline, os.path.dirname(self.pipeline)):
+            ruta = os.path.join(d, "lanzar.py")
+            if os.path.exists(ruta) and os.path.exists(os.path.join(d, "daily.py")):
+                return d
+        if os.path.exists(os.path.join(self.pipeline, "daily.py")):
+            origen = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extras", "lanzar.py")
+            if os.path.exists(origen):
+                shutil.copy(origen, os.path.join(self.pipeline, "lanzar.py"))
+                return self.pipeline
+        return None
+
+    def _lanzar(self, *args, timeout=90):
+        carpeta = self._lanzador()
+        if not carpeta:
+            return None
+        r = subprocess.run(["py", "-u", "lanzar.py", *args], cwd=carpeta, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=timeout, creationflags=SIN_VENTANA)
+        return (r.stdout + r.stderr).strip()
+
+    def parar(self):
+        r = self._lanzar("parar")
+        return "Detuve la tanda de Pill&Go y su vigía." if r is not None else "No encontré lanzar.py."
+
     # ---------- tarea ----------
     def iniciar(self):
+        if not os.path.isdir(self.pipeline):
+            return f"No encuentro la carpeta {self.pipeline}."
+        try:
+            self.fecha = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+            r = self._lanzar(self.fecha)
+            if r is not None:
+                self.estado, self.inicio = "lanzado con lanzar.py", time.time()
+                if "Ya hay una tanda corriendo" in r:
+                    return "Ya hay una tanda de Pill&Go corriendo; no lanzo otra. El vigía la está cuidando."
+                if "No pude lanzar" in r:
+                    return "No pude lanzar la tanda: " + r.split("No pude lanzar la tanda:")[-1][:200]
+                return (f"Tanda de Pill&Go para el {self.fecha} lanzada por el Programador de tareas, independiente de mí. "
+                        "El vigía la revisa cada 5 minutos, la relanza si se corta y le avisa por Telegram.")
+        except Exception as e:
+            log.warning("lanzar.py falló, uso el método interno: %s", e)
+        return self._iniciar_interno()
+
+    def _iniciar_interno(self):
         if self.hilo and self.hilo.is_alive():
             return f"Ya estoy generando los videos del {self.fecha}. Le aviso al terminar."
         if self._daily_corriendo():
@@ -147,6 +192,12 @@ class PillGo:
         self.avisar(texto, urgente=not ok)
 
     def resumen(self):
+        try:
+            r = self._lanzar("estado", timeout=60)
+            if r is not None:
+                return "Pill&Go:\n" + "\n".join(r.splitlines()[:12])
+        except Exception as e:
+            log.warning("lanzar.py estado: %s", e)
         if self.estado == "inactivo":
             return "No hay generación de videos en curso."
         hechos = self._contar(self.videos)[0] if self.fecha else 0

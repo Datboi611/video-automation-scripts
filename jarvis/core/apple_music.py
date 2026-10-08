@@ -71,18 +71,25 @@ def _buscar(win, nombre, tipos=None, intentos=3):
 
 
 def _boton_cabecera(win, nombres):
-    """Botón de la cabecera de la playlist (no el de la barra del reproductor de abajo)."""
+    """Botón de la cabecera de la playlist, no el de la barra del reproductor (que en la app de Windows
+    está arriba de todo y en la web abajo): de los que hay en la parte superior, el más bajo."""
     try:
-        alto = win.rectangle().top + (win.rectangle().height() * 0.6)
+        r = win.rectangle()
+        limite, barra = r.top + r.height() * 0.6, r.top + 120
     except Exception:
-        alto = 10 ** 6
+        limite, barra = 10 ** 6, 0
+    candidatos = []
     for n, el in _elementos(win):
         try:
-            if n in nombres and el.element_info.control_type == "Button" and el.rectangle().top < alto:
-                return el
+            if n in nombres and el.element_info.control_type == "Button":
+                top = el.rectangle().top
+                if top < limite:
+                    candidatos.append((top, el))
         except Exception:
             pass
-    return None
+    if len(candidatos) < 2:  # solo está el de la barra del reproductor: no sirve
+        return candidatos[0][1] if candidatos and candidatos[0][0] >= barra else None
+    return max(candidatos, key=lambda c: c[0])[1]
 
 
 def _clic(el):

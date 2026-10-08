@@ -87,8 +87,9 @@ SPECS = [
     ("shopify_ventas", "Ventas de la tienda Shopify (Ezma Shop): pedidos, total vendido, pendientes de envío.", {"dias": ("integer", "1=hoy, 7=semana")}, []),
     ("shopify_pedidos", "Últimos pedidos de Shopify con cliente, monto, estado y productos.", {"cantidad": ("integer", "Cuántos")}, []),
     ("shopify_inventario", "Stock y precios de productos en Shopify.", {"busqueda": (S, "Producto, opcional")}, []),
-    ("pillgo_videos", "Genera los 5 videos diarios de Pill&Go (daily.py con la fecha de mañana) en segundo plano y avisa al terminar.", {}),
+    ("pillgo_videos", "Genera los 5 videos diarios de Pill&Go: ejecuta 'py lanzar.py' (tanda con fecha de mañana desvinculada en el Programador de tareas + vigía que relanza y avisa por Telegram).", {}),
     ("pillgo_estado", "Estado de la generación de videos de Pill&Go en curso.", {}),
+    ("pillgo_parar", "Detiene la tanda de videos de Pill&Go y su vigía (solo si el usuario lo pide).", {}),
     ("diagnostico", "Revisa que todos los servicios funcionen (IA, Telegram, llamadas, voz, Todoist, Canvas, correo).", {}),
     ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
      {"que": (S, "pendientes | anuncios | notas | cursos")}, []),
@@ -150,7 +151,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"pillgo_videos", "pillgo_estado", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"pillgo_videos", "pillgo_estado", "pillgo_parar", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -768,6 +769,9 @@ class Herramientas:
 
     def pillgo_estado(self):
         return self.pillgo.resumen()
+
+    def pillgo_parar(self):
+        return self.pillgo.parar()
 
     def diagnostico(self):
         from . import diagnostico

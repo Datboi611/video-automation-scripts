@@ -153,6 +153,8 @@ def accion_rapida(texto, herr, cfg):
     if re.search(r"\b(ads|anuncios|adds)\b", t) and re.search(r"\b(haz|has|hazme|genera|crea|ejecuta|corre|lanza|make|run|generate|create|do|start)\b", t):
         t = "genera los videos de pillgo"
     if re.search(r"\bvideos?\b", t) and re.search(r"p[ií]ll?\s*(and|&|y|en)?\s*go|pillgo|diarios", t):
+        if re.search(r"\b(para|det[eé]n|cancela|frena|stop)\b", t):
+            return herr.ejecutar("pillgo_parar", {})
         if re.search(r"c[oó]mo va|estado|cu[aá]ntos|progreso|avance", t):
             return herr.ejecutar("pillgo_estado", {})
         if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):
