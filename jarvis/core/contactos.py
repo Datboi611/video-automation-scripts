@@ -85,10 +85,19 @@ def internacional(numero):
     """Número con código de país. Sin código: 9 dígitos que empiezan en 9 = celular de Perú (+51);
     10 dígitos = EE. UU. (+1). Con 00 delante se toma como prefijo internacional."""
     n = re.sub(r"[^\d+]", "", numero or "")
+    if n.startswith("00"):
+        n = "+" + n[2:]
+    if n.startswith("+54"):  # Argentina: a celulares se llama con +54 9, sin el 0 ni el 15 locales
+        resto = n[3:].lstrip("0")
+        if not resto.startswith("9"):
+            m = re.match(r"^(\d{2,4}?)15(\d{6,8})$", resto)
+            resto = "9" + (m.group(1) + m.group(2) if m and len(m.group(1) + m.group(2)) == 10 else resto)
+        return "+54" + resto
     if n.startswith("+"):
         return n
-    if n.startswith("00"):
-        return "+" + n[2:]
+    m = re.match(r"^0(\d{2,4})15(\d{6,8})$", n)  # formato local argentino: 011 15 1234-5678
+    if m and len(m.group(1) + m.group(2)) == 10:
+        return "+549" + m.group(1) + m.group(2)
     if len(n) == 9 and n.startswith("9"):
         return "+51" + n
     if len(n) == 11 and n.startswith("51"):
