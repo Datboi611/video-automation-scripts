@@ -37,13 +37,17 @@ class Calendario:
         import icalendar
         import recurring_ical_events
 
-        r = requests.get(self.url, timeout=15)
-        r.raise_for_status()
-        cal = icalendar.Calendar.from_ical(r.content)
         inicio = desde or dt.date.today()
         fin = inicio + dt.timedelta(days=dias)
-        salida = []
-        for ev in recurring_ical_events.of(cal).between(inicio, fin):
+        salida, todos = [], []
+        for url in self.url.split():  # varios calendarios (Google, Canvas...) separados por espacio
+            try:
+                r = requests.get(url, timeout=15)
+                r.raise_for_status()
+                todos += list(recurring_ical_events.of(icalendar.Calendar.from_ical(r.content)).between(inicio, fin))
+            except Exception as e:
+                log.warning("Calendario %s: %s", url[:60], e)
+        for ev in todos:
             ini = ev.get("DTSTART").dt
             todo_el_dia = not isinstance(ini, dt.datetime)
             if not todo_el_dia and ini.tzinfo:
@@ -61,7 +65,7 @@ class Calendario:
     def texto(self, dias=1):
         evs = self.eventos(dias)
         if evs is None:
-            return "Google Calendar no está conectado (falta 'google_calendar_ics' en config.json)."
+            return "El calendario no está conectado (falta 'google_calendar_ics' en config.json)."
         if not evs:
             return "Sin eventos en el calendario."
         lineas = []

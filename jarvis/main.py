@@ -186,6 +186,7 @@ PATRONES_CLAVE = [
     (r"\bAIza[0-9A-Za-z_-]{30,}\b", "gemini_api_key"),
     (r"\bAQ\.[0-9A-Za-z_-]{30,}", "gemini_api_key"),
     (r"https://calendar\.google\.com/calendar/ical/\S+?\.ics", "google_calendar_ics"),
+    (r"https://\S+/feeds/calendars/\S+?\.ics", "google_calendar_ics"),
     (r"\bAC[a-f0-9]{32}\b", "twilio_sid"),
     (r"\bshpat_[a-f0-9]{32}\b", "shopify"),
     (r"\bshpss_[A-Za-z0-9]{20,}\b", "shopify"),
@@ -478,6 +479,9 @@ class Jarvis:
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
         valor = valor.strip()
         c = self.cfg
+        if campo == "google_calendar_ics":  # se suma a los calendarios que ya había
+            previos = (c["agenda"].get(campo) or "").split()
+            valor = " ".join(dict.fromkeys(previos + valor.split()))
         if campo in ("todoist_token", "google_calendar_ics"):
             c["agenda"][campo] = valor
             config.guardar_valor(["agenda", campo], valor)
