@@ -70,6 +70,7 @@ class Cerebro:
         self.habilidades = habilidades
         self.historial = []
         self.hubo_error = False
+        self.ultimo_motivo = ""
         self._solo = None
         self._previas = set()
         self.proveedores = []
@@ -117,6 +118,7 @@ class Cerebro:
             except Exception as e:
                 espera = _segundos_reintento(e)
                 log.warning("Proveedor %s (%s) falló: %s", nombre, modelo, e)
+                self.ultimo_motivo = f"{nombre}/{modelo}: {str(e)[:220]}"
                 if espera and espera <= 4:  # límite por minuto con espera corta: reintenta el mismo
                     time.sleep(espera)
                     try:

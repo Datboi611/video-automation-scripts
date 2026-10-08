@@ -22,7 +22,8 @@ import requests
 log = logging.getLogger("jarvis")
 SIN_VENTANA = 0x08000000 if sys.platform == "win32" else 0
 PUERTO = 8787
-DESPEDIDAS = re.compile(r"\b(adi[oó]s|chao|chau|eso es todo|nada m[aá]s|gracias,? (eso es todo|jarvis)|cuelga|hasta luego)\b", re.I)
+DESPEDIDAS = re.compile(r"\b(adi[oó]s|chao|chau|eso es todo|nada m[aá]s|cuelga|hasta luego|ya est[aá]|es todo)\b"
+                        r"|^\W*(no|nop|nope|nada|no gracias|no,? gracias|gracias|listo|ya|ok|est[aá] bien|perfecto)\W*$", re.I)
 
 
 class LlamadasVivo:
@@ -169,7 +170,7 @@ class LlamadasVivo:
 
             def pensar():
                 try:
-                    self.pendientes[pid] = self.j.procesar(texto, hablar=False, origen="telefono")
+                    self.pendientes[pid] = self.j.procesar(texto, hablar=False, origen="telefono", sincrono=True)
                 except Exception:
                     log.exception("Llamada en vivo")
                     self.pendientes[pid] = f"Deme un momento más, {jefe}."
@@ -191,7 +192,7 @@ class LlamadasVivo:
                 self.pendientes.pop(pid, None)
                 return f"<Response>{self._escuchar(r + ' ¿Algo más?')}</Response>"
             time.sleep(0.25)
-        if intento >= 12:
+        if intento >= 16:
             self.pendientes.pop(pid, None)
             return f"<Response>{self._escuchar('Sigo trabajando en eso; se lo mando por Telegram al terminar. ¿Algo más?')}</Response>"
         aviso = self._decir("Un momento.") if intento == 0 else ""

@@ -561,7 +561,7 @@ class Jarvis:
                     self.escucha.silencio.clear()
                 self.estado("escuchando" if self.escucha else "reposo")
 
-    def procesar(self, texto, hablar=True, idioma="es", origen="voz"):
+    def procesar(self, texto, hablar=True, idioma="es", origen="voz", sincrono=False):
         """Cada pedido es un proceso independiente: pueden correr varios a la vez."""
         if self.escucha:
             self.escucha.actividad()
@@ -596,6 +596,12 @@ class Jarvis:
         finally:
             self.activos -= 1
         etiqueta = ("📱 " if origen == "telefono" else "") + texto
+        if error and getattr(self.cerebro, "ultimo_motivo", ""):
+            self.ui("panel", "Conexión IA", [{"t": "Groq no respondió", "tono": "warn", "items": [
+                {"x": self.cerebro.ultimo_motivo, "sub": "Si se repite, mándale esta captura a Claude", "tags": []}]}])
+        if error and sincrono:  # en una llamada: espero la respuesta real en vez de decir "enseguida"
+            self.ui("proceso", pid, etiqueta, "reintentando…")
+            return self._reintentar(texto, idioma, origen, pid, etiqueta, hablar=False, devolver=True)
         if error:
             # nunca "hubo un error": aviso natural y sigo intentándolo en segundo plano
             self.ui("proceso", pid, etiqueta, "reintentando…")
@@ -613,11 +619,11 @@ class Jarvis:
             self.estado("reposo")
         return respuesta
 
-    def _reintentar(self, texto, idioma, origen, pid, etiqueta, hablar):
+    def _reintentar(self, texto, idioma, origen, pid, etiqueta, hablar, devolver=False):
         """Reintenta en silencio; si Groq no vuelve, usa a Claude como cerebro de respaldo."""
         from core.cerebro import claude_respaldo
         respuesta = None
-        for espera in (6, 20, 45):
+        for espera in ((2, 6) if devolver else (6, 20, 45)):
             time.sleep(espera)
             try:
                 r = self.cerebro.responder(texto, idioma=idioma)
@@ -629,6 +635,14 @@ class Jarvis:
         if not respuesta:
             self.ui("proceso", pid, etiqueta, "consultando a Claude")
             respuesta = claude_respaldo(texto, self.cerebro._sistema())
+        if devolver:  # llamada en curso: devuelvo lo que haya y, si nada, sigo en segundo plano
+            if respuesta:
+                self.ui("proceso", pid, etiqueta, "hecho")
+                return respuesta
+            threading.Thread(target=self._reintentar, args=(texto, idioma, origen, pid, etiqueta, False),
+                             daemon=True).start()
+            return (f"Mis servidores van lentos ahora, {self.cfg['tratamiento']}. "
+                    "Le mando la respuesta por Telegram en cuanto la tenga.")
         intento = 0
         while not respuesta:  # no me rindo: sigo hasta tener la respuesta
             intento += 1
