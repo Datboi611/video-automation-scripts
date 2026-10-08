@@ -140,6 +140,9 @@ def accion_rapida(texto, herr, cfg):
         cuerpo = re.sub(r"^(de )?prueba$", "", m.group(1).strip()) or "Prueba de JARVIS ✅ Todo funciona, jefe."
         r = herr.ejecutar("notificar_telefono", {"mensaje": cuerpo[:1].upper() + cuerpo[1:]})
         return (f"Enviado a su iPhone, {j}." + acotacion("mensaje", cfg, herr)) if r.startswith(("Mensaje enviado", "Notificación")) else r
+    if re.search(r"(lo que )?estoy viendo|mira (mi |la |esta )?pantalla|qu[eé] (ves|hay) en (mi |la )?pantalla|"
+                 r"(ves|mira|revisa|lee|explica(me)?) (esto|este error|esta p[aá]gina|lo que tengo)|toma(le)? (una )?captura y", t):
+        return herr.ejecutar("ver_pantalla", {"pregunta": texto})
     if re.search(r"\b(ads|anuncios|adds)\b", t) and re.search(r"\b(haz|has|hazme|genera|crea|ejecuta|corre|lanza|make|run|generate|create|do|start)\b", t):
         t = "genera los videos de pillgo"
     if re.search(r"\bvideos?\b", t) and re.search(r"p[ií]ll?\s*(and|&|y|en)?\s*go|pillgo|diarios", t):

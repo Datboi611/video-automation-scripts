@@ -578,11 +578,12 @@ class Herramientas:
         img.convert("RGB").save(buf, "JPEG", quality=80)
         b64 = base64.b64encode(buf.getvalue()).decode()
         mensaje = [{"role": "user", "content": [
-            {"type": "text", "text": pregunta + " Responde en español, breve."},
+            {"type": "text", "text": f"Eres JARVIS mirando la pantalla de tu jefe. {pregunta} Responde en español, "
+                                     "breve (2-4 frases), concreto y útil; si hay un error dile cómo arreglarlo."},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}]}]
         errores = []
-        for prov, modelo in (("groq", "meta-llama/llama-4-scout-17b-16e-instruct"),
-                             ("gemini", "gemini-flash-latest")):
+        for prov, modelo in (("gemini", "gemini-flash-lite-latest"), ("gemini", "gemini-flash-latest"),
+                             ("groq", "meta-llama/llama-4-scout-17b-16e-instruct")):
             clave = config.clave(self.cfg, prov)
             if not clave:
                 continue
@@ -592,7 +593,26 @@ class Herramientas:
                 return r.choices[0].message.content
             except Exception as e:
                 errores.append(f"{prov}: {e}")
-        return "No pude analizar la pantalla. " + " | ".join(errores)
+        # respaldo: Claude Code (plan del usuario) mira la captura guardada en disco
+        try:
+            import subprocess
+            import sys
+            from .claude_code import ruta_claude
+            exe = ruta_claude()
+            if exe:
+                ruta = os.path.join(config.DATOS, "pantalla.jpg")
+                img.convert("RGB").save(ruta, "JPEG", quality=80)
+                r = subprocess.run([exe, "-p", f"Lee la imagen {ruta} (captura de mi pantalla). {pregunta} "
+                                    "Responde como JARVIS en español, 2-4 frases.", "--allowedTools", "Read",
+                                    "--output-format", "text"], capture_output=True, text=True, timeout=120,
+                                   encoding="utf-8", errors="replace",
+                                   creationflags=0x08000000 if sys.platform == "win32" else 0)
+                if (r.stdout or "").strip():
+                    return r.stdout.strip()
+        except Exception as e:
+            errores.append(f"claude: {e}")
+        log.warning("Visión falló: %s", " | ".join(errores))
+        return "No pude analizar la pantalla ahora mismo; las IA con visión están sin cupo."
 
     def preguntar_a_claude(self, pregunta):
         webbrowser.open("https://claude.ai/new?q=" + urllib.parse.quote(pregunta))
