@@ -27,7 +27,7 @@ DEFAULTS = {
     "stt": {"motor": "auto", "modelo_local": "small"},
     # Mayordomo: español castellano formal y británico en inglés, algo más grave y pausado
     # Voz natural: sin alterar el tono (bajarlo distorsiona). motor "elevenlabs" = la más humana (opcional).
-    "voz": {"motor": "edge", "voz": "es-ES-AlvaroNeural", "voz_en": "en-GB-RyanNeural",
+    "voz": {"motor": "edge", "voz": "en-US-AndrewMultilingualNeural", "voz_en": "en-GB-RyanNeural",
             "velocidad": "+0%", "tono": "+0Hz", "elevenlabs_api_key": "", "elevenlabs_voz": "JBFqnCBsd6RMkjVDRZzb"},
     "agenda": {"google_calendar_ics": "", "todoist_token": "", "canvas_url": "https://utah.instructure.com", "canvas_token": ""},
     "telefono": {
@@ -86,26 +86,26 @@ def _merge(base, extra):
 def _migrar(usuario, ruta):
     """Actualiza un config.json viejo a los nuevos valores por defecto."""
     v = usuario.get("_version", 1)
-    if v >= 6:
+    if v >= 7:
         return
-    if v == 5:
-        _a_v6(usuario)
-        usuario["_version"] = 6
+    if v in (5, 6):
+        _a_v7(usuario)
+        usuario["_version"] = 7
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 4:
         _a_v5(usuario)
-        _a_v6(usuario)
-        usuario["_version"] = 6
+        _a_v7(usuario)
+        usuario["_version"] = 7
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 3:
         _a_v4(usuario)
         _a_v5(usuario)
-        _a_v6(usuario)
-        usuario["_version"] = 6
+        _a_v7(usuario)
+        usuario["_version"] = 7
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
@@ -123,8 +123,8 @@ def _migrar(usuario, ruta):
     usuario.setdefault("agenda", {"google_calendar_ics": "", "todoist_token": ""})
     _a_v4(usuario)
     _a_v5(usuario)
-    _a_v6(usuario)
-    usuario["_version"] = 6
+    _a_v7(usuario)
+    usuario["_version"] = 7
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
 
@@ -161,6 +161,16 @@ def _a_v6(usuario):
     voz = usuario.setdefault("voz", {})
     voz["motor"] = "edge"
     voz["voz_en"] = "en-GB-RyanNeural"
+
+
+def _a_v7(usuario):
+    """v7: de vuelta al español con la voz gratis más natural y fluida (Andrew multilingüe de Microsoft)."""
+    usuario["idioma"] = "es"
+    voz = usuario.setdefault("voz", {})
+    voz["motor"] = "edge"
+    voz["voz"] = "en-US-AndrewMultilingualNeural"
+    voz["velocidad"] = "+10%"
+    voz["tono"] = "+0Hz"
 
 
 def cargar():
