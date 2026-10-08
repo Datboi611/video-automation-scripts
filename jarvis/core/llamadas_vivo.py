@@ -103,6 +103,7 @@ class LlamadasVivo:
 
     def _configurar_numero(self):
         """Apunta el número de JARVIS a este PC para que pueda recibir tus llamadas."""
+        self.j.telefono.autocorregir_numeros()
         t = self.t
         api = f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/IncomingPhoneNumbers"
         auth = (t["twilio_sid"], t["twilio_token"])

@@ -404,6 +404,9 @@ class Jarvis:
             c["telefono"][k] = v
             config.guardar_valor(["telefono", k], v)
         faltan = [k for k in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero") if not c["telefono"].get(k)]
+        if not faltan:
+            self.telefono._numeros_revisados = True
+            self.telefono.autocorregir_numeros()
         if not faltan and getattr(self, "vivo", None) and not self.vivo.url:
             self.vivo.iniciar()
         if faltan:

@@ -56,8 +56,36 @@ class Telefono:
         t = self.cfg_tel
         return all(t.get(k) for k in ("twilio_sid", "twilio_token", "twilio_numero", "mi_numero"))
 
+    def autocorregir_numeros(self):
+        """Pregunta a Twilio qué números son de la cuenta: ese es el de JARVIS; el otro, el del usuario."""
+        t = self.cfg_tel
+        try:
+            r = requests.get(f"https://api.twilio.com/2010-04-01/Accounts/{t['twilio_sid']}/IncomingPhoneNumbers.json",
+                             auth=(t["twilio_sid"], t["twilio_token"]), timeout=15)
+            propios = [n["phone_number"] for n in r.json().get("incoming_phone_numbers", [])]
+        except Exception as e:
+            log.warning("No pude consultar los números de Twilio: %s", e)
+            return False
+        if not propios or t.get("twilio_numero") in propios:
+            return False
+        if t.get("mi_numero") in propios:  # estaban al revés
+            t["twilio_numero"], t["mi_numero"] = t["mi_numero"], t.get("twilio_numero", "")
+        else:
+            t["twilio_numero"] = propios[0]
+        log.info("Números corregidos: JARVIS %s → usted %s", t["twilio_numero"], t["mi_numero"])
+        try:
+            from . import config
+            config.guardar_valor(["telefono", "twilio_numero"], t["twilio_numero"])
+            config.guardar_valor(["telefono", "mi_numero"], t["mi_numero"])
+        except Exception:
+            pass
+        return True
+
     def llamar_twilio(self, mensaje):
         """Llamada telefónica REAL a tu número (contestas y escuchas a JARVIS)."""
+        if not getattr(self, "_numeros_revisados", False):
+            self._numeros_revisados = True
+            self.autocorregir_numeros()
         if self.vivo and self.vivo.url and not self.solo_alerta:
             try:  # con el túnel activo: JARVIS habla y luego puede conversar contigo
                 r = self.vivo.llamar_y_conversar(mensaje)
