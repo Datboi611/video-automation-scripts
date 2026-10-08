@@ -73,6 +73,7 @@ class Escucha:
         self._pre = []
         self._rms_eco = collections.deque(maxlen=300)
         self._rms_reciente = collections.deque(maxlen=25)
+        self._parciales = 0
         self.silencio = threading.Event()  # activo mientras JARVIS habla
         self._manual = threading.Event()
         act = cfg["activacion"]
@@ -178,15 +179,24 @@ class Escucha:
         else:
             self._rms_eco.clear()
         self._rms_reciente.append(rms)
+        from . import atenuar
+        musica = atenuar.hay_audio()
         if not self.rec.AcceptWaveform(frame.tobytes()):
-            return False  # solo frases completas: los parciales confunden música y ruido con «Jarvis»
+            # sin música basta con oír «Jarvis» claro en el parcial unas veces seguidas (respuesta rápida)
+            parcial = json.loads(self.rec.PartialResult()).get("partial", "")
+            self._parciales = self._parciales + 1 if self.palabra in parcial else 0
+            if not musica and not hablando and self._parciales >= 3 and pico_ok(self):
+                self._parciales = 0
+                self.rec.Reset()
+                return True
+            return False
+        self._parciales = 0
         res = json.loads(self.rec.Result())
         texto, final = res.get("text", ""), True
         if self.palabra not in texto:
             return False
-        from . import atenuar
         confianza = max([w.get("conf", 0) for w in res.get("result", []) if w.get("word") == self.palabra] or [1])
-        if confianza < (0.95 if atenuar.hay_audio() else 0.8):
+        if confianza < (0.85 if musica else 0.55):
             log.debug("«Jarvis» descartado (confianza %.2f)", confianza)
             return False
         if hablando:
@@ -346,6 +356,11 @@ class Escucha:
             except Exception:
                 log.exception("Error en el bucle de escucha")
                 time.sleep(1)
+
+
+def pico_ok(esc):
+    """Que de verdad haya habido voz (no solo ruido de fondo) en el último medio segundo."""
+    return bool(esc._rms_reciente) and max(esc._rms_reciente) > max(esc.ruido * 3, 0.01)
 
 
 def beep():
