@@ -585,7 +585,23 @@ class Jarvis:
         self.decir(msg)
 
     # ---------- Flujo principal ----------
+    def _a_ingles(self, texto):
+        """Modo inglés: lo que salga en español (frases fijas o la IA) se traduce antes de decirlo."""
+        if not re.search(r"\b(jefe|usted|est[aá]|ahora|listo|para|con|que|los|las|una|del|por|s[ií]|hecho|momento|tengo)\b|[ñáéíóú¿¡]", texto, re.I):
+            return texto
+        cache = self.__dict__.setdefault("_traducciones", {})
+        if texto not in cache:
+            r = self.cerebro.completar("Translate into natural British English, as JARVIS the butler speaking to his "
+                                       "employer (call him 'sir', never 'jefe'). Reply with the translation only:\n\n" + texto)
+            if not r:
+                return texto
+            cache[texto] = r
+        return cache[texto]
+
     def decir(self, texto, idioma="es"):
+        if self.cfg.get("idioma") == "en":
+            idioma = "en"
+            texto = self._a_ingles(texto)
         with self.lock_voz:  # varias respuestas a la vez se dicen por turnos
             self.ui("addMsg", "jarvis", texto)
             self.ui("setState", "hablando")

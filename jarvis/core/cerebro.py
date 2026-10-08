@@ -103,8 +103,9 @@ class Cerebro:
     def responder(self, texto, on_herramienta=lambda n: None, idioma="es"):
         self.hubo_error = False
         sistema = self._sistema()
-        if idioma == "en":
-            sistema += "\n\nThe user is speaking ENGLISH right now: answer in English."
+        if idioma == "en" or self.cfg.get("idioma") == "en":
+            sistema += ("\n\nLANGUAGE OVERRIDE: everything above is in Spanish only for reference. You MUST reply ONLY "
+                        "in British English, addressing the user as 'sir'. Never reply in Spanish.")
         # Una sola conversación compartida: si un modelo falla a mitad, el siguiente continúa
         # desde ahí sin repetir las acciones ya hechas.
         mensajes = [{"role": "system", "content": sistema}] + self.historial[-8:] + [
