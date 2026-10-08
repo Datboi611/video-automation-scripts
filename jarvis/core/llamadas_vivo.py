@@ -151,6 +151,8 @@ class LlamadasVivo:
         return self.t.get("twilio_voz", "Polly.Andres-Neural")
 
     def _decir(self, texto):
+        from .voz import pulir
+        texto = pulir(texto)
         """Con ElevenLabs configurado, la llamada usa la misma voz de JARVIS (George); si no, la de Twilio."""
         voz = self.j.cfg.get("voz", {})
         if self.url and voz.get("elevenlabs_api_key"):

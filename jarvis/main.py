@@ -619,6 +619,8 @@ class Jarvis:
         return cache[texto]
 
     def decir(self, texto, idioma="es"):
+        from core.voz import pulir
+        texto = pulir(texto)
         if self.cfg.get("idioma") == "en":
             idioma = "en"
             texto = self._a_ingles(texto)

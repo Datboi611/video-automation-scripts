@@ -16,7 +16,17 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 log = logging.getLogger("jarvis")
 
 
+def pulir(texto):
+    """Quita etiquetas como 'Acotación:' y la pausa antes del vocativo (', jefe' -> ' jefe')."""
+    texto = re.sub(r"[\(\[]\s*([^()\[\]]*)\s*[\)\]]", r"\1", texto)
+    texto = re.sub(r"\b(acotaci[oó]n|aside|comentario)\s*(ingeniosa|breve)?\s*[:\-—]\s*(\w)", lambda m: m.group(3).upper(), texto, flags=re.I)
+    texto = re.sub(r"\s*,\s*(jefe|señor|sir|boss)\b", r" \1", texto, flags=re.I)
+    texto = re.sub(r"\b(jefe|señor|sir|boss)\s*,\s*", r"\1 ", texto, flags=re.I)
+    return re.sub(r"\s+", " ", texto).strip()
+
+
 def limpiar(texto):
+    texto = pulir(texto)
     texto = re.sub(r"```.*?```", " ", texto, flags=re.S)
     texto = re.sub(r"https?://\S+", "el enlace", texto)
     texto = re.sub(r"[*_#`>|]", "", texto)
