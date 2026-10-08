@@ -166,7 +166,7 @@ class Cerebro:
     def _bucle(self, cliente, modelo, mensajes, on_herramienta):
         for _ in range(12):
             r = cliente.chat.completions.create(
-                model=modelo, messages=mensajes, tools=self.herr.esquemas(self._solo), tool_choice="auto",
+                model=modelo, messages=_firmar(mensajes) if "gemini" in modelo else _sin_firmas(mensajes), tools=self.herr.esquemas(self._solo), tool_choice="auto",
                 temperature=0.7, max_tokens=500,
             )
             msg = r.choices[0].message
@@ -176,8 +176,9 @@ class Cerebro:
             self._solo = (self._solo or set()) | {tc.function.name for tc in msg.tool_calls}
             mensajes.append({
                 "role": "assistant", "content": msg.content or "",
-                "tool_calls": [{"id": tc.id, "type": "function",
-                                "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                "tool_calls": [dict({"id": tc.id, "type": "function",
+                                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}},
+                                    **({"extra_content": tc.extra_content} if getattr(tc, "extra_content", None) else {}))
                                for tc in msg.tool_calls],
             })
             def correr(tc):
@@ -196,6 +197,29 @@ class Cerebro:
             for tc, resultado in zip(msg.tool_calls, resultados):
                 mensajes.append({"role": "tool", "tool_call_id": tc.id, "content": resultado})
         return "He completado las acciones posibles."
+
+
+def _firmar(mensajes):
+    """Gemini 3 exige 'thought_signature' en cada llamada a herramienta previa; las que hizo otro modelo
+    (Groq) no la tienen, así que se marca con el valor que Google acepta para saltar la validación."""
+    out = []
+    for m in mensajes:
+        if m.get("tool_calls"):
+            m = dict(m, tool_calls=[tc if tc.get("extra_content") else dict(
+                tc, extra_content={"google": {"thought_signature": "skip_thought_signature_validator"}})
+                for tc in m["tool_calls"]])
+        out.append(m)
+    return out
+
+
+def _sin_firmas(mensajes):
+    """Los demás proveedores no conocen 'extra_content': se quita."""
+    out = []
+    for m in mensajes:
+        if m.get("tool_calls"):
+            m = dict(m, tool_calls=[{k: v for k, v in tc.items() if k != "extra_content"} for tc in m["tool_calls"]])
+        out.append(m)
+    return out
 
 
 def _segundos_reintento(e):
