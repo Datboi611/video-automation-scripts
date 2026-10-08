@@ -710,7 +710,11 @@ class Jarvis:
         """Reintenta en silencio; si Groq no vuelve, usa a Claude como cerebro de respaldo."""
         from core.cerebro import claude_respaldo
         respuesta = None
-        for espera in ((2, 6) if devolver else (6, 20, 45)):
+        # todas las IA gratis sin cupo: Claude (el plan del usuario) responde de inmediato, sin esperas
+        if "quota" in (self.cerebro.ultimo_motivo or "") or "429" in (self.cerebro.ultimo_motivo or ""):
+            self.ui("proceso", pid, etiqueta, "consultando a Claude")
+            respuesta = claude_respaldo(texto, self.cerebro._sistema())
+        for espera in (() if respuesta else (2, 6) if devolver else (6, 20, 45)):
             time.sleep(espera)
             try:
                 r = self.cerebro.responder(texto, idioma=idioma)
