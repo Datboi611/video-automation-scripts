@@ -1,6 +1,7 @@
 """Shopify (Admin API) con un token de app personalizada: ventas, pedidos e inventario."""
 import datetime as dt
 import logging
+import time
 
 import requests
 
@@ -9,17 +10,32 @@ VERSION = "2025-07"
 
 
 class Shopify:
-    def __init__(self, tienda, token):
+    def __init__(self, tienda, token=None, client_id=None, client_secret=None):
         self.tienda = (tienda or "").replace("https://", "").strip("/ ")
         if self.tienda and "." not in self.tienda:
             self.tienda += ".myshopify.com"
         self.token = (token or "").strip()
+        self.client_id, self.client_secret = (client_id or "").strip(), (client_secret or "").strip()
+        self._vence = 0
 
     @property
     def listo(self):
-        return bool(self.tienda and self.token)
+        return bool(self.tienda and (self.token or (self.client_id and self.client_secret)))
+
+    def _renovar(self):
+        """Apps del Dev Dashboard: token por 'client credentials' (dura ~24 h); se renueva solo."""
+        if not (self.client_id and self.client_secret) or time.time() < self._vence:
+            return
+        r = requests.post(f"https://{self.tienda}/admin/oauth/access_token", timeout=20,
+                          data={"grant_type": "client_credentials", "client_id": self.client_id,
+                                "client_secret": self.client_secret})
+        r.raise_for_status()
+        d = r.json()
+        self.token = d["access_token"]
+        self._vence = time.time() + int(d.get("expires_in", 86399)) - 300
 
     def _gql(self, query, variables=None):
+        self._renovar()
         r = requests.post(f"https://{self.tienda}/admin/api/{VERSION}/graphql.json", timeout=25,
                           headers={"X-Shopify-Access-Token": self.token, "Content-Type": "application/json"},
                           json={"query": query, "variables": variables or {}})

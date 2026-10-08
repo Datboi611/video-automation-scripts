@@ -184,6 +184,8 @@ PATRONES_CLAVE = [
     (r"\bAIza[0-9A-Za-z_-]{30,}\b", "gemini_api_key"),
     (r"\bAC[a-f0-9]{32}\b", "twilio_sid"),
     (r"\bshpat_[a-f0-9]{32}\b", "shopify"),
+    (r"\bshpss_[A-Za-z0-9]{20,}\b", "shopify"),
+    (r"\b[a-z0-9-]+\.myshopify\.com\b", "shopify"),
 ]
 
 
@@ -259,7 +261,8 @@ class Jarvis:
             "todoist": Todoist(c["agenda"]["todoist_token"]),
             "pendientes": Pendientes(os.path.join(config.DATOS, "pendientes.json")),
             "correo": Correo(c.get("correo", [])),
-            "shopify": Shopify(c.get("shopify", {}).get("tienda"), c.get("shopify", {}).get("token")),
+            "shopify": Shopify(c.get("shopify", {}).get("tienda"), c.get("shopify", {}).get("token"),
+                               c.get("shopify", {}).get("client_id"), c.get("shopify", {}).get("client_secret")),
             "canvas": Canvas(c["agenda"].get("canvas_url"), c["agenda"].get("canvas_token"), config.DATOS),
         }
         self.habilidades = Habilidades(os.path.join(config.BASE, "habilidades"))
@@ -427,21 +430,31 @@ class Jarvis:
             self.ui("panel", "Twilio", [{"t": "Motivo", "tono": "crit", "items": [{"x": str(e)[:300], "sub": "", "tags": []}]}])
 
     def guardar_shopify(self, texto):
-        token = re.search(r"shpat_[a-f0-9]{32}", texto).group(0)
+        token = re.search(r"shpat_[a-f0-9]{32}", texto)
+        secreto = re.search(r"shpss_[A-Za-z0-9]{20,}", texto)
+        cid = re.search(r"\b[a-f0-9]{32}\b", texto.replace(secreto.group(0), "") if secreto else texto)
         m = re.search(r"([a-z0-9-]+)\.myshopify\.com", texto, re.I)
-        tienda = (m.group(0) if m else self.cfg.get("shopify", {}).get("tienda", "")).lower()
+        previo = self.cfg.get("shopify", {})
+        tienda = (m.group(0) if m else previo.get("tienda", "")).lower()
+        datos = {"tienda": tienda, "token": token.group(0) if token else "",
+                 "client_id": cid.group(0) if (cid and secreto) else previo.get("client_id", ""),
+                 "client_secret": secreto.group(0) if secreto else previo.get("client_secret", "")}
         if not tienda:
-            self.herramientas.pedir_dato("shopify", "Falta la tienda: pega tienda.myshopify.com y el token")
-            return self.decir("Me falta el nombre de la tienda, jefe; péguelo junto al token.")
-        self.cfg["shopify"] = {"tienda": tienda, "token": token}
-        config.guardar_valor(["shopify"], self.cfg["shopify"])
-        sh = Shopify(tienda, token)
+            self.herramientas.pedir_dato("shopify", "Falta la tienda: pega tienda.myshopify.com con el Client ID y secret")
+            return self.decir("Me falta el nombre de la tienda, jefe; péguelo junto a las claves.")
+        self.cfg["shopify"] = datos
+        config.guardar_valor(["shopify"], datos)
+        sh = Shopify(tienda, datos["token"], datos["client_id"], datos["client_secret"])
         self.herramientas.agenda["shopify"] = sh
+        if not sh.listo:
+            self.herramientas.pedir_dato("shopify", "Pega el Client ID y el Client secret (shpss_...)")
+            return self.decir("Anotada la tienda. Me faltan el Client ID y el secret.")
         try:
             self.decir(f"Shopify conectado, {self.cfg['tratamiento']}. {sh.ventas(1)}")
         except Exception as e:
             log.warning("Shopify: %s", e)
-            self.decir("Guardé los datos, pero Shopify no me dejó entrar. Revise que la app tenga los permisos de lectura.")
+            self.ui("panel", "Shopify", [{"t": "No pude entrar", "tono": "warn", "items": [{"x": str(e)[:250], "sub": "", "tags": []}]}])
+            self.decir("Guardé los datos, pero Shopify no me dejó entrar. Le dejé el motivo en el panel.")
 
     def guardar_campo(self, campo, valor):
         """Lo que el usuario escribe en la barra cuando JARVIS le pide un dato."""
