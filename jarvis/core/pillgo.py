@@ -101,6 +101,19 @@ class PillGo:
                            encoding="utf-8", errors="replace", timeout=timeout, creationflags=SIN_VENTANA)
         return (r.stdout + r.stderr).strip()
 
+    def _seguir(self):
+        """Mientras JARVIS esté abierto, cuenta los FINALES cada 5 min y llama al terminar."""
+        fecha, inicio = self.fecha, time.time()
+        carpetas = [self.videos, os.path.join(self.pipeline, "videos_diarios")]
+        while time.time() - inicio < 16 * 3600 and self.fecha == fecha:
+            time.sleep(300)
+            hechos = max(len(glob.glob(os.path.join(c, fecha, "FINALES", "*.mp4"))) for c in carpetas)
+            if hechos >= ESPERADOS:
+                horas = (time.time() - inicio) / 3600
+                self.estado = "terminado"
+                self.avisar(f"Pill&Go: listos los {hechos} videos del {fecha} ({horas:.1f} h).", urgente=True, llamar=True)
+                return
+
     def parar(self):
         r = self._lanzar("parar")
         return "Detuve la tanda de Pill&Go y su vigía." if r is not None else "No encontré lanzar.py."
@@ -118,8 +131,10 @@ class PillGo:
                     return "Ya hay una tanda de Pill&Go corriendo; no lanzo otra. El vigía la está cuidando."
                 if "No pude lanzar" in r:
                     return "No pude lanzar la tanda: " + r.split("No pude lanzar la tanda:")[-1][:200]
+                threading.Thread(target=self._seguir, daemon=True).start()
                 return (f"Tanda de Pill&Go para el {self.fecha} lanzada por el Programador de tareas, independiente de mí. "
-                        "El vigía la revisa cada 5 minutos, la relanza si se corta y le avisa por Telegram.")
+                        "El vigía la revisa cada 5 minutos y la relanza si se corta; cuando termine le aviso por Telegram "
+                        "y le llamo por teléfono.")
         except Exception as e:
             log.warning("lanzar.py falló, uso el método interno: %s", e)
         return self._iniciar_interno()

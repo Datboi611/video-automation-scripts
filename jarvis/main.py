@@ -394,10 +394,15 @@ class Jarvis:
         self.ui("setHint", "Te escucho siempre")
         self.decir(msg)
 
-    def aviso_tarea(self, texto, urgente=False):
-        """Avisos de tareas largas: Telegram + voz (si está en casa) + panel."""
+    def aviso_tarea(self, texto, urgente=False, llamar=False):
+        """Avisos de tareas largas: Telegram + voz (si está en casa) + panel; con llamar=True, también llamada."""
         if self.bot:
             self.bot.enviar(texto)
+        if llamar:
+            try:
+                self.telefono.llamar(f"{self.cfg['tratamiento'].capitalize()}, le habla JARVIS. {texto}")
+            except Exception as e:
+                log.warning("Llamada de aviso falló: %s", e)
         self.ui("panel", "Pill&Go", paneles.desde_texto(texto))
         self.avisar_por_voz(re.sub(r"[^\w\s,.:;¿?¡!/&()-]", "", texto.split("\n")[0]))
 
