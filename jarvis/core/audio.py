@@ -68,7 +68,8 @@ class Escucha:
         self._eco_frames = 0
         self._previo = collections.deque(maxlen=25)
         self.cola = queue.Queue()
-        self.muteado = False  # botón de la interfaz: micrófono apagado
+        self.muteado = False
+        self.verificar = None  # función(audio) -> bool: confirma con Whisper que se dijo «Jarvis»  # botón de la interfaz: micrófono apagado
         self._hist = collections.deque(maxlen=250)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
         self._pre = []
         self._rms_eco = collections.deque(maxlen=300)
@@ -189,7 +190,7 @@ class Escucha:
             if not musica and not hablando and self._parciales >= 3 and pico_ok(self):
                 self._parciales = 0
                 self.rec.Reset()
-                return True
+                return self._confirmar()
             return False
         self._parciales = 0
         res = json.loads(self.rec.Result())
@@ -209,7 +210,20 @@ class Escucha:
                     self.rec.Reset()
                 return False
         self.rec.Reset()
-        return True
+        return self._confirmar()
+
+    def _confirmar(self):
+        """Segunda opinión: Whisper escucha los últimos ~2 s y dice si de verdad era «Jarvis»."""
+        if not self.verificar:
+            return True
+        audio = list(self._hist)[-70:]
+        if not audio:
+            return False
+        try:
+            return bool(self.verificar(np.concatenate(audio)))
+        except Exception:
+            log.exception("Verificación de palabra")
+            return True
 
     def _esperar_activacion(self):
         while True:

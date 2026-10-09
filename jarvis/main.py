@@ -311,6 +311,7 @@ class Jarvis:
             self.oido = Oido(c)
             self.escucha = Escucha(c, self.estado, self.nivel, self.comando_de_voz, self.despertar)
             self.escucha.on_interrupcion = self.voz.detener
+            self.escucha.verificar = self.oido.dice_palabra
             modos = ["di «" + c["activacion"]["palabra"].capitalize() + "»" if self.escucha.rec else None,
                      "aplaude dos veces" if c["activacion"]["aplausos"] else None, "toca la esfera"]
             self.ui("setHint", f"Te escucho siempre · tras {c['minutos_reposo']} min sin hablar descanso; "

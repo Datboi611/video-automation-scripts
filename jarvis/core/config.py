@@ -49,7 +49,7 @@ DEFAULTS = {
     "apple_playlists": ["General", "Ingles", "Car play", "For all", "Lee fields", "Marvin Gaye", "Bad Days", "Clasic",
                         "Single", "Vaunt", "TikTok Songs", "My Shazam Tracks", "Canciones favoritas"],  # "es" = siempre español; "auto" = español o inglés según cómo hables
     "minutos_reposo": 30,
-    "segundos_silencio": 1.6,
+    "segundos_silencio": 2.2,
     "interrumpir": True,
     "factor_interrupcion": 2.8,
     "vocabulario": "",
@@ -89,18 +89,24 @@ def _merge(base, extra):
 def _migrar(usuario, ruta):
     """Actualiza un config.json viejo a los nuevos valores por defecto."""
     v = usuario.get("_version", 1)
-    if v >= 7:
+    if v >= 8:
+        return
+    if v == 7:
+        usuario["segundos_silencio"] = 2.2  # dejar terminar de hablar (antes cortaba a 1.6 s)
+        usuario["_version"] = 8
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v in (5, 6):
         _a_v7(usuario)
-        usuario["_version"] = 7
+        usuario["_version"] = 8
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
     if v == 4:
         _a_v5(usuario)
         _a_v7(usuario)
-        usuario["_version"] = 7
+        usuario["_version"] = 8
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
@@ -108,7 +114,7 @@ def _migrar(usuario, ruta):
         _a_v4(usuario)
         _a_v5(usuario)
         _a_v7(usuario)
-        usuario["_version"] = 7
+        usuario["_version"] = 8
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(usuario, f, ensure_ascii=False, indent=2)
         return
@@ -127,7 +133,7 @@ def _migrar(usuario, ruta):
     _a_v4(usuario)
     _a_v5(usuario)
     _a_v7(usuario)
-    usuario["_version"] = 7
+    usuario["_version"] = 8
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(usuario, f, ensure_ascii=False, indent=2)
 

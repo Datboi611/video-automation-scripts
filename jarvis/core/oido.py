@@ -1,4 +1,5 @@
 """Voz a texto: Whisper en Groq (gratis, ultra rápido) o faster-whisper local (offline)."""
+import re
 import io
 import logging
 import wave
@@ -113,6 +114,32 @@ class Oido:
         if len(texto) < 2 or any(a in bajo for a in ALUCINACIONES) and len(texto) < 40:
             return "", idioma
         return texto, idioma
+
+    def dice_palabra(self, audio, patron=r"[jyhg]h?[aáe]r?[bv]i[sz]|jarv|yarv|harv|charv|jarbi|jervi"):
+        """Confirma con Whisper (sin pistas de vocabulario, para que no 'invente' la palabra) que de verdad
+        se dijo «Jarvis». Evita que un golpe, una tos o la música lo activen."""
+        audio = limpiar_audio(audio)
+        try:
+            if self.key_groq:
+                if self._groq is None:
+                    from openai import OpenAI
+                    self._groq = OpenAI(api_key=self.key_groq, base_url=config.URLS_PROVEEDOR["groq"], timeout=20)
+                r = self._groq.audio.transcriptions.create(model="whisper-large-v3-turbo", file=("w.wav", _wav(audio)),
+                                                           language="es", temperature=0)
+                texto = r.text
+            else:
+                if self._local is None:
+                    from faster_whisper import WhisperModel
+                    self._local = WhisperModel(self.cfg["stt"]["modelo_local"], device="cpu", compute_type="int8")
+                x = audio.astype(np.float32) / 32768
+                segs, _ = self._local.transcribe(x, beam_size=1, language="es", vad_filter=True)
+                texto = " ".join(s.text for s in segs)
+        except Exception as e:
+            log.warning("No pude verificar la palabra de activación: %s", e)
+            return True  # sin verificación, mejor responder que quedarse sordo
+        ok = bool(re.search(patron, texto.lower()))
+        log.info("Verificación de «Jarvis»: %r -> %s", texto[:60], ok)
+        return ok
 
     def transcribir_archivo(self, datos, nombre="nota.ogg"):
         """Notas de voz del teléfono (ogg/m4a/mp3)."""
