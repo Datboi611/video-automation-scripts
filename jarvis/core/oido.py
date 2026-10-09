@@ -137,7 +137,10 @@ class Oido:
         except Exception as e:
             log.warning("No pude verificar la palabra de activación: %s", e)
             return True  # sin verificación, mejor responder que quedarse sordo
-        ok = bool(re.search(patron, texto.lower()))
+        import difflib
+        palabras = re.findall(r"[a-záéíóúñü]+", texto.lower())
+        ok = bool(re.search(patron, texto.lower())) or any(
+            difflib.SequenceMatcher(None, w, "jarvis").ratio() >= 0.6 for w in palabras if len(w) >= 4)
         log.info("Verificación de «Jarvis»: %r -> %s", texto[:60], ok)
         return ok
 
