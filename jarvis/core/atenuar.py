@@ -10,6 +10,34 @@ _lock = threading.Lock()
 _guardados = {}  # pid -> volumen original
 
 
+def _es_jarvis(proceso):
+    """La voz de JARVIS sale de python(w).exe; Windows recuerda el volumen por programa, así que nunca
+    se toca ningún python (si no, la próxima vez JARVIS arrancaría bajito)."""
+    try:
+        return proceso.pid == os.getpid() or proceso.name().lower().startswith("python")
+    except Exception:
+        return False
+
+
+def voz_a_tope():
+    """Devuelve la voz de JARVIS al 100 % en el mezclador de Windows (por si quedó baja)."""
+    if sys.platform != "win32":
+        return
+    try:
+        import comtypes
+        from pycaw.pycaw import AudioUtilities
+        comtypes.CoInitialize()
+        for s in AudioUtilities.GetAllSessions():
+            if s.Process and _es_jarvis(s.Process):
+                vol = s.SimpleAudioVolume
+                if vol.GetMasterVolume() < 0.99:
+                    vol.SetMasterVolume(1.0, None)
+                if vol.GetMute():
+                    vol.SetMute(0, None)
+    except Exception as e:
+        log.debug("No pude ajustar el volumen de JARVIS: %s", e)
+
+
 def bajar(nivel=0.2):
     if sys.platform != "win32":
         return
@@ -19,7 +47,7 @@ def bajar(nivel=0.2):
             from pycaw.pycaw import AudioUtilities
             comtypes.CoInitialize()
             for s in AudioUtilities.GetAllSessions():
-                if not s.Process or s.Process.pid == os.getpid():
+                if not s.Process or _es_jarvis(s.Process):
                     continue  # la voz de JARVIS no se baja
                 vol = s.SimpleAudioVolume
                 pid = s.Process.pid
@@ -62,7 +90,7 @@ def hay_audio():
         from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
         comtypes.CoInitialize()
         for s in AudioUtilities.GetAllSessions():
-            if not s.Process or s.Process.pid == os.getpid():
+            if not s.Process or _es_jarvis(s.Process):
                 continue
             medidor = s._ctl.QueryInterface(IAudioMeterInformation)
             if medidor.GetPeakValue() > 0.01:

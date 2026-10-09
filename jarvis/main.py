@@ -648,6 +648,11 @@ class Jarvis:
         if self.cfg.get("idioma") == "en":
             idioma = "en"
             texto = self._a_ingles(texto)
+        try:
+            from core import atenuar
+            atenuar.voz_a_tope()
+        except Exception:
+            pass
         with self.lock_voz:  # varias respuestas a la vez se dicen por turnos
             self.ui("addMsg", "jarvis", texto)
             self.ui("setState", "hablando")

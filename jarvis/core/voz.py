@@ -180,6 +180,15 @@ class Voz:
         import numpy as np
         import pygame
         sonido = pygame.mixer.Sound(ruta)
+        try:  # normaliza: las voces gratis salen bajitas; se suben hasta casi el máximo sin distorsionar
+            crudo = pygame.sndarray.array(sonido)
+            pico = float(np.abs(crudo).max() or 1)
+            ganancia = min(3.0, 30000 / pico)
+            if ganancia > 1.1:
+                sonido = pygame.sndarray.make_sound(np.clip(crudo.astype(np.float32) * ganancia, -32767, 32767)
+                                                    .astype(crudo.dtype))
+        except Exception:
+            pass
         try:  # envolvente de volumen para animar la esfera con la voz real
             arr = np.abs(pygame.sndarray.array(sonido).astype(np.float32))
             mono = arr.mean(axis=1) if arr.ndim == 2 else arr
