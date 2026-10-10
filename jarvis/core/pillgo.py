@@ -181,7 +181,7 @@ class PillGo:
                         urgente=True)
             return "Flow pide iniciar sesión: le avisé por Telegram y no reintento."
         # 8) el mismo video falló 2+ veces seguidas: seguir con los demás uno por uno y avisar
-        fallos = re.findall(r"(\d{2})_\w+?: \S+ falló|ERROR (\d{2})_", log_txt)
+        fallos = re.findall(r"(\d{2})_[\w-]+?: \S+ falló|ERROR (\d{2})_", log_txt)
         cuenta = {}
         for a, b in fallos:
             cuenta[a or b] = cuenta.get(a or b, 0) + 1
