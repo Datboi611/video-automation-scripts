@@ -159,11 +159,15 @@ def accion_rapida(texto, herr, cfg):
     if re.search(r"(lo que )?estoy viendo|mira (mi |la |esta )?pantalla|qu[eé] (ves|hay) en (mi |la )?pantalla|"
                  r"(ves|mira|revisa|lee|explica(me)?) (esto|este error|esta p[aá]gina|lo que tengo)|toma(le)? (una )?captura y", t):
         return herr.ejecutar("ver_pantalla", {"pregunta": texto})
+    if re.search(r"\b(ads|anuncios|adds)\b", t) and re.search(r"repara|arregla|fall[oó]|se cort[oó]|reanuda|contin[uú]a", t):
+        return herr.ejecutar("pillgo_reparar", {})
     if re.search(r"\b(ads|anuncios|adds)\b", t) and re.search(r"\b(haz|has|hazme|genera|crea|ejecuta|corre|lanza|make|run|generate|create|do|start)\b", t):
         t = "genera los videos de pillgo"
     if re.search(r"\bvideos?\b", t) and re.search(r"p[ií]ll?\s*(and|&|y|en)?\s*go|pillgo|diarios", t):
         if re.search(r"\b(para|det[eé]n|cancela|frena|stop)\b", t):
             return herr.ejecutar("pillgo_parar", {})
+        if re.search(r"repara|arregla|fall[oó]|se cort[oó]|reanuda|contin[uú]a|sigue", t):
+            return herr.ejecutar("pillgo_reparar", {})
         if re.search(r"c[oó]mo va|estado|cu[aá]ntos|progreso|avance", t):
             return herr.ejecutar("pillgo_estado", {})
         if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):

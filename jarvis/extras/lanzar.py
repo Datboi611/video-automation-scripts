@@ -1,6 +1,7 @@
 """Lanza la tanda diaria DESVINCULADA de la terminal y de Jarvis (Programador de tareas de Windows),
 y arranca un VIGÍA que la revisa cada 5 minutos, la relanza si se corta y avisa por Telegram.
 
+  py lanzar.py lanzar --date AAAA-MM-DD -> tanda de esa fecha + vigía
   py lanzar.py              -> tanda de hoy (fecha = mañana, el plan va un día adelantado) + vigía
   py lanzar.py 2026-10-09   -> esa fecha concreta
   py lanzar.py estado       -> ¿corre la tanda? ¿corre el vigía? últimas líneas del log
@@ -18,7 +19,7 @@ TASK, TASK_VIGIA = "PillgoAhora", "PillgoVigia"
 LOG, LOG_VIGIA = HERE / "lanzar_log.txt", HERE / "vigia_log.txt"
 PS = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 CADA = 300            # el vigía revisa cada 5 min
-SIN_ACTIVIDAD = 40    # minutos sin tocar ningún log => colgado
+SIN_ACTIVIDAD = 25    # minutos sin tocar ningún log => colgado
 MAX_RELANZ = 6
 OBJETIVO = 5
 
@@ -151,51 +152,109 @@ def estado():
             print("\n".join(tail(f, 15)))
 
 
+FIRMAS = [  # (clave, texto en el log, qué pasó, arreglo)
+    ("login",   "pide iniciar sesión",            "Flow pide iniciar sesión en Google. Entra a mano al Brave de Flow.", None),
+    ("rechazo", "Flow rechazó la generación",     "Flow rechaza generar (cola/cuota). Espero 20 min y reanudo.", "esperar"),
+    ("sinimg",  "No apareció la imagen",          "No salió la imagen en 10 min. Recargo Flow y reanudo ese video.", "reset"),
+    ("editor",  "No encuentro el cuadro",         "Flow quedó en editor/panel de chat. Recargo el proyecto y reanudo.", "reset"),
+    ("cerrado", "has been closed",                "Se cerró Brave/la pestaña. Reabro Brave y reanudo.", "reset"),
+    ("conexion","ECONNREFUSED",                   "Brave sin puerto 9222. Reabro Brave y reanudo.", "reset"),
+    ("proyecto","No pude abrir el proyecto",      "No pude abrir el proyecto en Flow. Revisa Brave.", None),
+    ("imgfallo","imágenes falló",                 "Falló la generación de imágenes de un video. Reanudo solo lo que falta.", "reset"),
+    ("vidfallo","videos falló",                   "Falló la generación de clips de un video. Reanudo solo lo que falta.", "reset"),
+]
+
+
+def reset_flow():
+    py = sys.executable
+    r = subprocess.run([py, "-u", "daily.py", "--reset"], cwd=HERE, capture_output=True, text=True, timeout=300)
+    vlog("reset_flow: " + (r.stdout + r.stderr).strip()[-200:])
+    return r.returncode == 0
+
+
+def lineas_nuevas(fecha, pos):
+    """Líneas añadidas a los logs desde la última revisión. pos = {ruta: bytes leídos}."""
+    out = []
+    for f in (HERE / "videos_diarios" / fecha / "log.txt", LOG):
+        try:
+            sz = f.stat().st_size
+        except Exception:
+            continue
+        ini = pos.get(str(f), max(0, sz - 20000))
+        if sz < ini: ini = 0
+        with open(f, "rb") as fh:
+            fh.seek(ini); out += fh.read().decode("utf-8", "replace").splitlines()
+        pos[str(f)] = sz
+    return out
+
+
+def pendientes(fecha):
+    d = HERE / "videos_diarios" / fecha / "FINALES"
+    hechos = {p.name.split("_VIDEO-TERMINADO_")[-1][:2] for p in d.glob("*.mp4")} if d.exists() else set()
+    return [i for i in range(1, OBJETIVO + 1) if f"{i:02d}" not in hechos]
+
+
 def vigilar(fecha):
     if len(vigia_pids()) > 1:   # ya hay otro vigía (yo cuento como uno)
         vlog("Ya hay un vigía activo; salgo."); return
     vlog(f"Vigía iniciado para {fecha}.")
-    telegram(f"Vigía activo. Tanda {fecha} en marcha, reviso cada {CADA // 60} min.")
-    relanz, inicio, avisados, sin_sesion = 0, datetime.now(), set(), False
+    telegram(f"Vigía activo. Tanda {fecha} en marcha, reviso cada {CADA // 60} min. Faltan slots: {pendientes(fecha)}")
+    relanz, inicio, avisados, sin_sesion, pos = 0, datetime.now(), {}, False, {}
+    lineas_nuevas(fecha, pos)
+    ultimo_n = finales(fecha)
     while True:
         time.sleep(CADA)
         n = finales(fecha)
+        if n > ultimo_n:
+            telegram(f"🎬 Video listo ({n}/{OBJETIVO}). Faltan slots: {pendientes(fecha)}")
+            ultimo_n, relanz = n, 0
         if n >= OBJETIVO:
-            telegram(f"✅ Listos los {n} videos de {fecha}. Relanzamientos: {relanz}.")
+            telegram(f"✅ Listos los {n} videos de {fecha}.")
             return
         if datetime.now() - inicio > timedelta(hours=14):
-            telegram(f"⚠ Llevo 14 horas y solo hay {n}/{OBJETIVO} videos. Dejo de vigilar.")
+            telegram(f"⚠ Llevo 14 horas y solo hay {n}/{OBJETIVO}. Dejo de vigilar. Faltan: {pendientes(fecha)}")
             return
-        recientes = "\n".join(tail(HERE / "videos_diarios" / fecha / "log.txt", 60) + tail(LOG, 60))
-        if "pide iniciar sesión" in recientes and "login" not in avisados:
-            avisados.add("login"); sin_sesion = True
-            telegram("⚠ Flow pide iniciar sesión en Google. Entra a mano al Brave de Flow. Pauso los relanzamientos.")
-        if "No pude abrir el proyecto" in recientes and "proyecto" not in avisados:
-            avisados.add("proyecto")
-            telegram("⚠ No pude abrir el proyecto «Videos Metodologia Avatar Hype» en Flow. Revisa Brave.")
-        if sin_sesion and "pide iniciar sesión" not in recientes:
+        nuevas = "\n".join(lineas_nuevas(fecha, pos))
+        accion = None
+        for clave, txt, msg, fix in FIRMAS:
+            if txt in nuevas:
+                avisados[clave] = avisados.get(clave, 0) + 1
+                if avisados[clave] <= 3:
+                    telegram(f"⚠ {msg}  [{n}/{OBJETIVO}]")
+                if clave == "login":
+                    sin_sesion = True
+                elif fix == "esperar":
+                    accion = accion or "esperar"
+                elif fix == "reset" and accion != "esperar":
+                    accion = "reset"
+        if sin_sesion and "pide iniciar sesión" not in nuevas and tanda_pids():
             sin_sesion = False
         if sin_sesion:
             continue
-        if not tanda_pids():
-            if relanz >= MAX_RELANZ:
-                telegram(f"❌ Se cortó {MAX_RELANZ} veces y van {n}/{OBJETIVO} videos. Necesito ayuda manual.")
-                return
-            relanz += 1
-            telegram(f"⚠ La tanda se cortó ({n}/{OBJETIVO} videos). Relanzo (intento {relanz}/{MAX_RELANZ}).")
-            ok, info = iniciar_tanda(fecha)
-            if not ok:
-                telegram(f"❌ No pude relanzar: {info[:200]}")
-            continue
+        colgada = False
         act = ultima_actividad(fecha)
-        if act and datetime.now() - act > timedelta(minutes=SIN_ACTIVIDAD):
-            if relanz >= MAX_RELANZ:
-                telegram(f"❌ Colgada otra vez y ya usé {MAX_RELANZ} relanzamientos ({n}/{OBJETIVO}). Necesito ayuda manual.")
-                return
-            relanz += 1
-            telegram(f"⚠ La tanda lleva {SIN_ACTIVIDAD}+ min sin avanzar ({n}/{OBJETIVO}). La reinicio (intento {relanz}/{MAX_RELANZ}).")
-            parar_tanda(); time.sleep(20)
-            iniciar_tanda(fecha)
+        if act and tanda_pids() and datetime.now() - act > timedelta(minutes=SIN_ACTIVIDAD):
+            colgada = True
+            telegram(f"⚠ {SIN_ACTIVIDAD}+ min sin avanzar ({n}/{OBJETIVO}). Reinicio.")
+        if tanda_pids() and not colgada:
+            # la tanda sigue viva; si hay fallo la dejo seguir (ya cierra, espera y recarga sola entre videos)
+            continue
+        # tanda muerta o colgada -> arreglar desde donde quedó
+        if relanz >= MAX_RELANZ:
+            telegram(f"❌ {MAX_RELANZ} relanzamientos sin avanzar ({n}/{OBJETIVO}). Faltan: {pendientes(fecha)}. Necesito ayuda manual.")
+            return
+        relanz += 1
+        parar_tanda(); time.sleep(10)
+        if accion == "esperar":
+            telegram("⏳ Espero 20 min por el rechazo de Flow antes de reanudar.")
+            time.sleep(20 * 60)
+        try:
+            reset_flow()
+        except Exception as e:
+            vlog(f"reset_flow falló: {e}")
+        ok, info = iniciar_tanda(fecha)   # reanuda: salta imágenes/clips/finales ya hechos
+        telegram(f"🔧 Reanudo desde donde quedó (intento {relanz}/{MAX_RELANZ}). Faltan: {pendientes(fecha)}" if ok
+                 else f"❌ No pude relanzar: {info[:200]}")
 
 
 def lanzar(fecha):
@@ -217,6 +276,8 @@ def lanzar(fecha):
 
 if __name__ == "__main__":
     a = sys.argv[1] if len(sys.argv) > 1 else ""
+    if a == "lanzar":  # py lanzar.py lanzar --date AAAA-MM-DD
+        a = sys.argv[sys.argv.index("--date") + 1] if "--date" in sys.argv else ""
     manana = (date.today() + timedelta(days=1)).isoformat()
     if a == "estado": estado()
     elif a == "parar": parar()

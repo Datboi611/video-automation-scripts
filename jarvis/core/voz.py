@@ -87,7 +87,12 @@ class Voz:
                             self.on_aviso(f"La voz de George (ElevenLabs) {motivo}; uso la voz gratis mientras tanto.")
                         except Exception:
                             pass
-            if self.cfg["motor"] in ("edge", "elevenlabs"):
+            if self.cfg["motor"] == "kokoro":
+                try:
+                    return self._por_frases(texto, self._generar_kokoro)
+                except Exception as e:
+                    log.warning("Kokoro falló, uso edge-tts: %s", e)
+            if self.cfg["motor"] in ("edge", "elevenlabs", "kokoro"):
                 elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
                 respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-ES-AlvaroNeural"
                 for voz in dict.fromkeys([elegida, respaldo]):
@@ -95,6 +100,11 @@ class Voz:
                         return self._por_frases(texto, lambda t, v=voz: self._generar(t, v))
                     except Exception as e:
                         log.warning("edge-tts falló con %s: %s", voz, e)
+            if self.cfg["motor"] != "kokoro":  # sin internet: voz neuronal local antes que la robótica de Windows
+                try:
+                    return self._por_frases(texto, self._generar_kokoro)
+                except Exception as e:
+                    log.warning("Kokoro (respaldo offline) no disponible: %s", e)
             self._sapi(texto)
         finally:
             self.hablando = False
@@ -123,6 +133,42 @@ class Voz:
                                        pitch=self.cfg.get("tono", "+0Hz")).save(ruta)
 
         asyncio.run(gen())
+        return ruta
+
+    # ---------- Kokoro: voz neuronal local (offline, gratis para siempre; idea tomada de OpenJarvis) ----------
+    KOKORO = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
+
+    def _kokoro(self):
+        if getattr(self, "_kk", None) is None:
+            import requests
+            from kokoro_onnx import Kokoro
+            base = os.path.join(os.path.dirname(self.carpeta), "kokoro")
+            os.makedirs(base, exist_ok=True)
+            for nombre in ("kokoro-v1.0.int8.onnx", "voices-v1.0.bin"):
+                ruta = os.path.join(base, nombre)
+                if not os.path.exists(ruta):
+                    log.info("Descargando %s (solo la primera vez)…", nombre)
+                    with requests.get(self.KOKORO + nombre, stream=True, timeout=60) as r:
+                        r.raise_for_status()
+                        with open(ruta + ".part", "wb") as f:
+                            for trozo in r.iter_content(1 << 20):
+                                f.write(trozo)
+                    os.replace(ruta + ".part", ruta)
+            self._kk = Kokoro(os.path.join(base, "kokoro-v1.0.int8.onnx"), os.path.join(base, "voices-v1.0.bin"))
+        return self._kk
+
+    def _generar_kokoro(self, texto):
+        import wave
+        import numpy as np
+        voz = self.cfg.get("kokoro_voz", "em_alex")  # em_alex / em_santa (hombre), ef_dora (mujer)
+        vel = 1.0 + int(str(self.cfg.get("velocidad", "+0%")).strip("%+") or 0) / 100
+        muestras, sr = self._kokoro().create(texto, voice=voz, speed=max(0.7, min(1.4, vel)), lang="es")
+        ruta = os.path.join(self.carpeta, f"{uuid.uuid4().hex}.wav")
+        with wave.open(ruta, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(sr)
+            w.writeframes((np.clip(muestras, -1, 1) * 32767).astype(np.int16).tobytes())
         return ruta
 
     def _generar_11(self, texto):

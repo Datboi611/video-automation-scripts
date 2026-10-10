@@ -89,6 +89,9 @@ SPECS = [
     ("shopify_inventario", "Stock y precios de productos en Shopify.", {"busqueda": (S, "Producto, opcional")}, []),
     ("pillgo_videos", "Genera los 5 videos diarios de Pill&Go: ejecuta 'py lanzar.py' (tanda con fecha de mañana desvinculada en el Programador de tareas + vigía que relanza y avisa por Telegram).", {}),
     ("pillgo_estado", "Estado de la generación de videos de Pill&Go en curso.", {}),
+    ("pillgo_reparar", "Si la tanda de Pill&Go falló o se cortó: sigue el procedimiento (estado, recargar Flow, abrir Brave, esperar 20 min si Flow rechazó, avisar si pide login) y REANUDA lo pendiente.", {}),
+    ("pillgo_reanudar", "Reanuda la tanda de Pill&Go desde donde quedó; con 'video' (1-5) solo ese video. Nunca empieza de cero ni cambia la fecha.", {"video": ("integer", "Número de video 1-5 (opcional)")}, []),
+    ("pillgo_reset_flow", "Recarga Flow cuando está trabado (editor, chat, no encuentra el cuadro): py -u daily.py --reset.", {}),
     ("pillgo_parar", "Detiene la tanda de videos de Pill&Go y su vigía (solo si el usuario lo pide).", {}),
     ("diagnostico", "Revisa que todos los servicios funcionen (IA, Telegram, llamadas, voz, Todoist, Canvas, correo).", {}),
     ("canvas", "Canvas de la universidad: pendientes/próximas entregas, anuncios, notas y mensajes, cursos.",
@@ -150,12 +153,12 @@ SPECS = [
      {"nombre": (S, "nombre_corto"), "descripcion": (S, "Qué hace y qué argumentos recibe"), "codigo": (S, "Código Python completo")}),
     ("usar_habilidad", "Ejecuta una habilidad instalada.", {"nombre": (S, "Nombre"), "argumentos": ("object", "Argumentos")}, ["nombre"]),
     ("instalar_paquete", "Instala un paquete de Python (pip) que necesite una habilidad.", {"paquete": (S, "Paquete")}),
-    ("cambiar_voz", "Cambia la voz de JARVIS. Para la voz más humana (ElevenLabs) usa pedir_dato con elevenlabs_api_key.", {"voz": (S, "Voz de edge-tts, p. ej. es-MX-JorgeNeural, en-US-AndrewMultilingualNeural"), "idioma": (S, "es/en")}, ["voz"]),
+    ("cambiar_voz", "Cambia la voz de JARVIS. Para la voz más humana (ElevenLabs) usa pedir_dato con elevenlabs_api_key.", {"voz": (S, "Voz de edge-tts (es-MX-JorgeNeural, en-US-AndrewMultilingualNeural) o 'kokoro' / em_alex / ef_dora para la voz local sin internet"), "idioma": (S, "es/en")}, ["voz"]),
 ]
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"pillgo_videos", "pillgo_estado", "pillgo_parar", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"pillgo_videos", "pillgo_estado", "pillgo_parar", "pillgo_reparar", "pillgo_reanudar", "pillgo_reset_flow", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -689,9 +692,19 @@ class Herramientas:
         return self.habilidades.ejecutar_python(codigo)
 
     def cambiar_voz(self, voz, idioma="es"):
+        from . import config
+        v = voz.lower().strip()
+        if "kokoro" in v or "offline" in v or "local" in v or v[:3] in ("em_", "ef_"):
+            kv = v if v[:3] in ("em_", "ef_") else ("ef_dora" if "mujer" in v or "dora" in v else "em_alex")
+            self.cfg["voz"].update({"motor": "kokoro", "kokoro_voz": kv})
+            config.guardar_valor(["voz", "motor"], "kokoro")
+            config.guardar_valor(["voz", "kokoro_voz"], kv)
+            return f"Voz local Kokoro ({kv}) activada: funciona sin internet. La primera vez descarga ~90 MB."
+        if self.cfg["voz"].get("motor") == "kokoro":
+            self.cfg["voz"]["motor"] = "edge"
+            config.guardar_valor(["voz", "motor"], "edge")
         clave = "voz_en" if idioma == "en" else "voz"
         self.cfg["voz"][clave] = voz
-        from . import config
         config.guardar_valor(["voz", clave], voz)
         return f"Voz cambiada a {voz}."
 
@@ -814,6 +827,15 @@ class Herramientas:
 
     def pillgo_estado(self):
         return self.pillgo.resumen()
+
+    def pillgo_reparar(self):
+        return self.pillgo.reparar()
+
+    def pillgo_reanudar(self, video=None):
+        return self.pillgo.reanudar(video)
+
+    def pillgo_reset_flow(self):
+        return self.pillgo.reset_flow()
 
     def pillgo_parar(self):
         return self.pillgo.parar()

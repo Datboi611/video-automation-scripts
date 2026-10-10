@@ -107,12 +107,95 @@ class PillGo:
         carpetas = [self.videos, os.path.join(self.pipeline, "videos_diarios")]
         while time.time() - inicio < 16 * 3600 and self.fecha == fecha:
             time.sleep(300)
-            hechos = max(len(glob.glob(os.path.join(c, fecha, "FINALES", "*.mp4"))) for c in carpetas)
+            dias = [fecha, (dt.date.fromisoformat(fecha) + dt.timedelta(days=1)).isoformat()]
+            hechos = max(len(glob.glob(os.path.join(c, d, "FINALES", "*.mp4"))) for c in carpetas for d in dias)
             if hechos >= ESPERADOS:
                 horas = (time.time() - inicio) / 3600
                 self.estado = "terminado"
                 self.avisar(f"Pill&Go: listos los {hechos} videos del {fecha} ({horas:.1f} h).", urgente=True, llamar=True)
                 return
+
+    def _args_lanzar(self, fecha):
+        """`py lanzar.py lanzar --date F` si su lanzar.py lo admite; si no, `py lanzar.py F`."""
+        try:
+            ayuda = self._lanzar("ayuda", timeout=30) or ""
+        except Exception:
+            ayuda = ""
+        return ["lanzar", "--date", fecha] if "lanzar --date" in ayuda else [fecha]
+
+    def _carpeta(self):
+        return self._lanzador() or self.pipeline
+
+    def _py(self, *args, timeout=300, esperar=True):
+        """Corre `py ...` en la carpeta del Pipeline. Con esperar=False queda desvinculado (sigue aunque JARVIS se cierre)."""
+        if esperar:
+            r = subprocess.run(["py", *args], cwd=self._carpeta(), capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=timeout, creationflags=SIN_VENTANA)
+            return (r.stdout + r.stderr).strip()
+        registro = open(os.path.join(self._carpeta(), "lanzar_log.txt"), "a", encoding="utf-8")
+        subprocess.Popen(["py", *args], cwd=self._carpeta(), stdout=registro, stderr=subprocess.STDOUT,
+                         creationflags=SIN_VENTANA | 0x00000008 | 0x00000200)  # DETACHED + NEW_PROCESS_GROUP
+        return ""
+
+    def _log_reciente(self, n=80):
+        fecha = self.fecha or dt.date.today().isoformat()
+        lineas = []
+        for d in (fecha, (dt.date.fromisoformat(fecha) + dt.timedelta(days=1)).isoformat()):
+            for ruta in (os.path.join(self._carpeta(), "videos_diarios", d, "log.txt"), os.path.join(self.videos, d, "log.txt")):
+                try:
+                    lineas += open(ruta, encoding="utf-8", errors="replace").read().splitlines()[-n:]
+                except OSError:
+                    pass
+        try:
+            lineas += open(os.path.join(self._carpeta(), "lanzar_log.txt"), encoding="utf-8",
+                           errors="replace").read().splitlines()[-n:]
+        except OSError:
+            pass
+        return "\n".join(lineas)
+
+    def reset_flow(self):
+        """Paso 2: Flow trabado (editor, chat, no encuentra el cuadro)."""
+        r = self._py("-u", "daily.py", "--reset")
+        return "Flow recargado." if "recargado" in r.lower() else "Recargué Flow: " + r[-200:]
+
+    def reanudar(self, solo=None):
+        """Pasos 3 y 4: reanuda lo pendiente (o solo el video N). Nunca empieza de cero ni cambia la fecha."""
+        if self._daily_corriendo():
+            return "La tanda sigue corriendo; no abro otra. Si está trabada, primero pídame recargar Flow."
+        fecha = self.fecha or dt.date.today().isoformat()
+        args = ["-u", "daily.py", "--date", fecha] + (["--only", str(int(solo))] if solo else [])
+        self._py(*args, esperar=False)
+        if not solo:
+            threading.Thread(target=self._seguir, daemon=True).start()
+        return f"Reanudando {'el video ' + str(solo) if solo else 'lo pendiente'} del {fecha}, desde donde quedó."
+
+    def reparar(self):
+        """Procedimiento de Diego si algo falla, en orden. Siempre reanuda, nunca empieza de cero."""
+        estado = self._lanzar("estado", timeout=60) or ""
+        if "TANDA: CORRIENDO" in estado:
+            return "La tanda está corriendo; el vigía la cuida. No toco nada."
+        log_txt = self._log_reciente()
+        if "pide iniciar sesión" in log_txt or "accounts.google.com" in log_txt:
+            self.avisar("Pill&Go: Flow pide iniciar sesión en Google. Entre a mano al Brave de Flow; no reintento.",
+                        urgente=True)
+            return "Flow pide iniciar sesión: le avisé por Telegram y no reintento."
+        if "rechazó la generación" in log_txt:
+            def esperar_y_reanudar():
+                time.sleep(20 * 60)
+                self.avisar("Pill&Go: pasaron 20 min del rechazo de Flow; reanudo. " + self.reanudar())
+            threading.Thread(target=esperar_y_reanudar, daemon=True).start()
+            return "Flow rechazó la generación: espero 20 minutos y reanudo lo pendiente."
+        pasos = []
+        if re.search(r"has been closed|ECONNREFUSED|9222|puerto de depuraci", log_txt):
+            subprocess.Popen(["py", "flow_runner.py", "launch"], cwd=self._carpeta(), creationflags=SIN_VENTANA)
+            time.sleep(20)
+            pasos.append("abrí Brave")
+        try:
+            pasos.append(self.reset_flow())
+        except Exception as e:
+            pasos.append(f"no pude recargar Flow ({str(e)[:80]})")
+        pasos.append(self.reanudar())
+        return "Pill&Go: " + "; ".join(pasos)
 
     def parar(self):
         r = self._lanzar("parar")
@@ -123,8 +206,8 @@ class PillGo:
         if not os.path.isdir(self.pipeline):
             return f"No encuentro la carpeta {self.pipeline}."
         try:
-            self.fecha = (dt.date.today() + dt.timedelta(days=1)).isoformat()
-            r = self._lanzar(self.fecha)
+            self.fecha = dt.date.today().isoformat()  # se lanza con la fecha de HOY (la carpeta sale como mañana)
+            r = self._lanzar(*self._args_lanzar(self.fecha))
             if r is not None:
                 self.estado, self.inicio = "lanzado con lanzar.py", time.time()
                 if "Ya hay una tanda corriendo" in r:
