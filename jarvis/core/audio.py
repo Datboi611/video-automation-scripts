@@ -187,7 +187,7 @@ class Escucha:
             # sin música basta con oír «Jarvis» claro en el parcial unas veces seguidas (respuesta rápida)
             parcial = json.loads(self.rec.PartialResult()).get("partial", "")
             self._parciales = self._parciales + 1 if self.palabra in parcial else 0
-            if not musica and not hablando and self._parciales >= 3 and pico_ok(self):
+            if not hablando and self._parciales >= (2 if not musica else 4) and pico_ok(self):
                 self._parciales = 0
                 self.rec.Reset()
                 return self._confirmar()
@@ -198,7 +198,7 @@ class Escucha:
         if self.palabra not in texto:
             return False
         confianza = max([w.get("conf", 0) for w in res.get("result", []) if w.get("word") == self.palabra] or [1])
-        if confianza < (0.85 if musica else 0.55):
+        if confianza < 0.4:  # Vosk solo propone candidatos; quien decide de verdad es Whisper (_confirmar)
             log.debug("«Jarvis» descartado (confianza %.2f)", confianza)
             return False
         if hablando:
@@ -214,6 +214,7 @@ class Escucha:
 
     def _confirmar(self):
         """Segunda opinión: Whisper escucha los últimos ~2 s y dice si de verdad era «Jarvis»."""
+        log.info("Candidato a «Jarvis»: verificando…")
         if not self.verificar:
             return True
         audio = list(self._hist)[-70:]

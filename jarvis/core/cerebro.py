@@ -89,6 +89,9 @@ class Cerebro:
                 modelos = _modelos_gemini(cliente, modelos)
             for m in modelos:
                 self.proveedores.append((p["nombre"], cliente, m))
+            if p["nombre"] == "ollama":  # precarga el modelo local para que la primera orden sea instantánea
+                import threading
+                threading.Thread(target=lambda c=cliente, m=modelos[0]: _calentar(c, m), daemon=True).start()
 
     def _sistema(self):
         ahora = dt.datetime.now()
@@ -118,6 +121,23 @@ class Cerebro:
         agotados = getattr(self, "_agotados", {})
         self._agotados = agotados
         vivos = [x for x in self.proveedores if agotados.get(x[2], 0) < time.time()] or self.proveedores
+        # IA LOCAL para el control del PC (rápida, sin cupo, sin internet); la nube para lo complejo y la web
+        locales = [x for x in vivos if x[0] == "ollama"]
+        if locales and es_tarea_local(texto):
+            corto = [{"role": "system", "content": SISTEMA_LOCAL.format(tratamiento=self.cfg["tratamiento"])}] + \
+                    self.historial[-2:] + [{"role": "user", "content": texto}]
+            for nombre, cliente, modelo in locales:
+                try:
+                    respuesta = self._bucle(cliente, modelo, corto, on_herramienta)
+                    if respuesta and respuesta != "He completado las acciones posibles.":
+                        log.info("Resuelto con la IA local (%s)", modelo)
+                        self.historial += [{"role": "user", "content": texto}, {"role": "assistant", "content": respuesta}]
+                        return respuesta
+                except Exception as e:
+                    log.warning("IA local falló (%s), paso a la nube: %s", modelo, e)
+            vivos = [x for x in vivos if x[0] != "ollama"] + locales
+        else:
+            vivos = [x for x in vivos if x[0] != "ollama"] + locales  # la local queda de último respaldo
         for nombre, cliente, modelo in vivos:
             try:
                 respuesta = self._bucle(cliente, modelo, mensajes, on_herramienta)
@@ -282,6 +302,32 @@ def claude_respaldo(texto, sistema, timeout=120):
     except Exception as e:
         log.warning("Claude de respaldo no respondió: %s", e)
         return None
+
+
+SISTEMA_LOCAL = """Eres JARVIS, asistente de voz en español que controla el PC con Windows de su jefe mediante herramientas.
+Usa la herramienta adecuada y responde en UNA frase corta y natural, en español, llamándolo "{tratamiento}". Sin markdown."""
+
+_LOCAL = re.compile(r"\b(abre|abrir|cierra|cerrar|minimiza|maximiza|volumen|sube|baja|silencia|mute|pausa|reanuda|siguiente|"
+                    r"anterior|captura|pantallazo|bloquea|apaga|reinicia|suspende|brillo|bater[ií]a|ram|cpu|procesos?|"
+                    r"carpeta|archivo|escribe|copia|pega|tecla|presiona|ventana|wifi|bluetooth|hora|fecha|alarma|"
+                    r"temporizador|recu[eé]rdame|recordatorio)\b")
+_NUBE = re.compile(r"busca|investiga|internet|web|google|noticia|clima|precio|qui[eé]n|explica|por qu[eé]|c[oó]mo (hago|funciona|se)|"
+                   r"redacta|resume|analiza|traduce|correo|mail|canvas|shopify|venta|pedido|llama|contacto|telegram|claude|"
+                   r"idea|plan|opini|consejo|pill|ads|anuncio|video|calendario|agenda|tarea|todoist|pantalla dice|qu[eé] ves")
+
+
+def es_tarea_local(texto):
+    """¿Es una orden simple de control del PC? -> IA local. Si no (web, razonamiento, cuentas) -> nube."""
+    t = texto.lower()
+    return bool(_LOCAL.search(t)) and not _NUBE.search(t) and len(t) < 160
+
+
+def _calentar(cliente, modelo):
+    try:
+        cliente.chat.completions.create(model=modelo, messages=[{"role": "user", "content": "hola"}], max_tokens=1)
+        log.info("IA local %s lista", modelo)
+    except Exception as e:
+        log.info("No pude precargar la IA local: %s", e)
 
 
 def _ollama_activo(url):
