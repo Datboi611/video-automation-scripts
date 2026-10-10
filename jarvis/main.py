@@ -172,9 +172,11 @@ def accion_rapida(texto, herr, cfg):
             return herr.ejecutar("pillgo_estado", {})
         if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):
             return herr.ejecutar("pillgo_videos", {}) + acotacion("videos", cfg, herr, 0.5)
-    m = re.search(r"(?:usa|pon|cambia(?: a)?)\s+(?:la\s+)?voz\s+(?:de\s+|del\s+)?(george|mayordomo|elevenlabs|kokoro|andrew|jorge|local|offline)", t)
+    m = re.search(r"(?:usa|pon|cambia(?: a)?)\s+(?:la\s+)?voz\s+(?:de\s+|del\s+)?(george|mayordomo|elevenlabs|kokoro|andrew|jorge|[aá]lvaro|espa[nñ]ol de espa[nñ]a|local|offline)", t)
     if m:
-        nombre = {"andrew": "en-US-AndrewMultilingualNeural", "jorge": "es-MX-JorgeNeural"}.get(m.group(1), m.group(1))
+        nombre = {"andrew": "en-US-AndrewMultilingualNeural", "jorge": "es-MX-JorgeNeural", "alvaro": "es-ES-AlvaroNeural",
+                  "álvaro": "es-ES-AlvaroNeural", "español de españa": "es-ES-AlvaroNeural",
+                  "espanol de espana": "es-ES-AlvaroNeural", "mayordomo": "es-ES-AlvaroNeural"}.get(m.group(1), m.group(1))
         return herr.ejecutar("cambiar_voz", {"voz": nombre})
     if re.search(r"(importa|carga|sube|actualiza|lee)\s+(mis |los )?contactos", t):
         return herr.ejecutar("importar_contactos", {})
