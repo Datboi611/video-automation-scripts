@@ -175,27 +175,56 @@ class PillGo:
         if "TANDA: CORRIENDO" in estado:
             return "La tanda está corriendo; el vigía la cuida. No toco nada."
         log_txt = self._log_reciente()
+        # 6) login: avisar y no reintentar
         if "pide iniciar sesión" in log_txt or "accounts.google.com" in log_txt:
             self.avisar("Pill&Go: Flow pide iniciar sesión en Google. Entre a mano al Brave de Flow; no reintento.",
                         urgente=True)
             return "Flow pide iniciar sesión: le avisé por Telegram y no reintento."
-        if "rechazó la generación" in log_txt:
+        # 8) el mismo video falló 2+ veces seguidas: seguir con los demás uno por uno y avisar
+        fallos = re.findall(r"(\d{2})_\w+?: \S+ falló|ERROR (\d{2})_", log_txt)
+        cuenta = {}
+        for a, b in fallos:
+            cuenta[a or b] = cuenta.get(a or b, 0) + 1
+        malos = sorted(int(k) for k, n in cuenta.items() if n >= 2)
+        # 7) Flow rechazó / cola llena / sin video en 30 min: esperar 20 min y reanudar
+        if re.search(r"rechazó la generación|\[espera\]|\[espera_img\]|cola llena|sin créditos", log_txt.split("\n")[-1] + "\n" +
+                     "\n".join(log_txt.splitlines()[-15:])):
             def esperar_y_reanudar():
                 time.sleep(20 * 60)
-                self.avisar("Pill&Go: pasaron 20 min del rechazo de Flow; reanudo. " + self.reanudar())
+                self.avisar("Pill&Go: pasaron 20 min del rechazo/cola de Flow; reanudo. " + self._reanudar_sin(malos))
             threading.Thread(target=esperar_y_reanudar, daemon=True).start()
-            return "Flow rechazó la generación: espero 20 minutos y reanudo lo pendiente."
+            return "Flow rechazó o tenía cola llena: espero 20 minutos y reanudo lo pendiente."
         pasos = []
-        if re.search(r"has been closed|ECONNREFUSED|9222|puerto de depuraci", log_txt):
+        # 5) Brave cerrado
+        if re.search(r"has been closed|ECONNREFUSED|9222|puerto de depuraci|No pude conectar al navegador", log_txt):
             subprocess.Popen(["py", "flow_runner.py", "launch"], cwd=self._carpeta(), creationflags=SIN_VENTANA)
             time.sleep(20)
             pasos.append("abrí Brave")
+        # 2) Flow trabado (editor, chat, cuadro, ingredientes, imagen de la biblioteca)
         try:
             pasos.append(self.reset_flow())
         except Exception as e:
             pasos.append(f"no pude recargar Flow ({str(e)[:80]})")
-        pasos.append(self.reanudar())
+        # 3/4) reanudar (los clips con otra persona ya los borró daily.py: se regeneran solos)
+        pasos.append(self._reanudar_sin(malos))
+        if malos:
+            self.avisar(f"Pill&Go: el video {', '.join(map(str, malos))} falló 2 veces seguidas; sigo con los demás.",
+                        urgente=True)
         return "Pill&Go: " + "; ".join(pasos)
+
+    def _reanudar_sin(self, malos):
+        """Reanuda todo; si hay videos que fallaron 2 veces, corre los demás uno por uno con --only."""
+        if not malos:
+            return self.reanudar()
+        fecha = self.fecha or dt.date.today().isoformat()
+        otros = [n for n in range(1, ESPERADOS + 1) if n not in malos]
+
+        def en_serie():
+            for n in otros:
+                self._py("-u", "daily.py", "--date", fecha, "--only", str(n), timeout=4 * 3600)
+            self.avisar(f"Pill&Go: terminé los videos {otros}; el {malos} necesita revisión manual.", urgente=True)
+        threading.Thread(target=en_serie, daemon=True).start()
+        return f"Sigo con los videos {otros} uno por uno (salto el {malos})."
 
     def parar(self):
         r = self._lanzar("parar")
