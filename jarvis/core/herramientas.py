@@ -694,6 +694,13 @@ class Herramientas:
     def cambiar_voz(self, voz, idioma="es"):
         from . import config
         v = voz.lower().strip()
+        if "george" in v or "elevenlabs" in v or "mayordomo" in v:
+            if not self.cfg["voz"].get("elevenlabs_api_key"):
+                self.pedir_dato("elevenlabs_api_key")
+                return "Para la voz de George pegue su clave de ElevenLabs en la barra."
+            self.cfg["voz"]["motor"] = "elevenlabs"
+            config.guardar_valor(["voz", "motor"], "elevenlabs")
+            return "Voz de George (mayordomo británico) activada. Si se acaba el cupo de ElevenLabs, uso la gratis mientras tanto."
         if "kokoro" in v or "offline" in v or "local" in v or v[:3] in ("em_", "ef_"):
             kv = v if v[:3] in ("em_", "ef_") else ("ef_dora" if "mujer" in v or "dora" in v else "em_alex")
             self.cfg["voz"].update({"motor": "kokoro", "kokoro_voz": kv})
