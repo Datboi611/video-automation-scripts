@@ -87,12 +87,17 @@ class Voz:
                             self.on_aviso(f"La voz de George (ElevenLabs) {motivo}; uso la voz gratis mientras tanto.")
                         except Exception:
                             pass
+            if self.cfg["motor"] == "clon":
+                try:
+                    return self._por_frases(texto, self._generar_clon)
+                except Exception as e:
+                    log.warning("Voz clonada falló, uso edge-tts: %s", e)
             if self.cfg["motor"] == "kokoro":
                 try:
                     return self._por_frases(texto, self._generar_kokoro)
                 except Exception as e:
                     log.warning("Kokoro falló, uso edge-tts: %s", e)
-            if self.cfg["motor"] in ("edge", "elevenlabs", "kokoro"):
+            if self.cfg["motor"] in ("edge", "elevenlabs", "kokoro", "clon"):
                 elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
                 respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-ES-AlvaroNeural"
                 for voz in dict.fromkeys([elegida, respaldo]):
@@ -168,6 +173,37 @@ class Voz:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(sr)
+            w.writeframes((np.clip(muestras, -1, 1) * 32767).astype(np.int16).tobytes())
+        return ruta
+
+    # ---------- Voz de George clonada en local (XTTS-v2): gratis, sin cupo, con GPU ----------
+    def _clon(self):
+        if getattr(self, "_xtts", None) is None:
+            os.environ.setdefault("COQUI_TOS_AGREED", "1")  # licencia no comercial de XTTS: uso personal
+            import torch
+            from TTS.api import TTS
+            dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
+            tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(dispositivo)
+            modelo = tts.synthesizer.tts_model
+            ref = self.cfg.get("clon_referencia") or os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "voces", "george_es.wav")
+            latente, embedding = modelo.get_conditioning_latents(audio_path=[ref])
+            self._xtts = (modelo, latente, embedding)
+            log.info("Voz clonada lista (%s)", dispositivo)
+        return self._xtts
+
+    def _generar_clon(self, texto):
+        import wave
+        import numpy as np
+        modelo, latente, embedding = self._clon()
+        vel = 1.0 + int(str(self.cfg.get("velocidad", "+0%")).strip("%+") or 0) / 100
+        out = modelo.inference(texto, "es", latente, embedding, temperature=0.7, speed=max(0.8, min(1.3, vel)))
+        muestras = np.asarray(out["wav"], dtype=np.float32)
+        ruta = os.path.join(self.carpeta, f"{uuid.uuid4().hex}.wav")
+        with wave.open(ruta, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(24000)
             w.writeframes((np.clip(muestras, -1, 1) * 32767).astype(np.int16).tobytes())
         return ruta
 

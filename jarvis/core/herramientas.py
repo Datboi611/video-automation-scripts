@@ -694,6 +694,18 @@ class Herramientas:
     def cambiar_voz(self, voz, idioma="es"):
         from . import config
         v = voz.lower().strip()
+        if ("george" in v or "mayordomo" in v) and "elevenlabs" not in v:
+            try:
+                import importlib.util
+                instalada = importlib.util.find_spec("TTS") is not None
+            except Exception:
+                instalada = False
+            if instalada:
+                self.cfg["voz"]["motor"] = "clon"
+                config.guardar_valor(["voz", "motor"], "clon")
+                return "Voz de George en español activada, generada en su PC: gratis y sin límite."
+            if not self.cfg["voz"].get("elevenlabs_api_key"):
+                return "Para la voz de George gratis, ejecute instalar_voz_george.bat en la carpeta de JARVIS."
         if "george" in v or "elevenlabs" in v or "mayordomo" in v:
             if not self.cfg["voz"].get("elevenlabs_api_key"):
                 self.pedir_dato("elevenlabs_api_key")
