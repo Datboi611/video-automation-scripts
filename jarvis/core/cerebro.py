@@ -78,6 +78,8 @@ class Cerebro:
             if p["nombre"] != "ollama" and not p.get("api_key"):
                 continue
             if p["nombre"] == "ollama" and not _ollama_activo(p.get("url")):
+                _arrancar_ollama()
+            if p["nombre"] == "ollama" and not _ollama_activo(p.get("url")):
                 continue  # sin Ollama instalado no pierdo tiempo intentándolo
             url = p.get("url") or config.URLS_PROVEEDOR.get(p["nombre"])
             timeout = 120 if p["nombre"] == "ollama" else 40 if p["nombre"] == "claude" else 25
@@ -320,6 +322,28 @@ def es_tarea_local(texto):
     """¿Es una orden simple de control del PC? -> IA local. Si no (web, razonamiento, cuentas) -> nube."""
     t = texto.lower()
     return bool(_LOCAL.search(t)) and not _NUBE.search(t) and len(t) < 160
+
+
+def _arrancar_ollama():
+    """Si Ollama está instalado pero apagado, lo enciende en segundo plano (sin ventana)."""
+    import os
+    import shutil
+    import subprocess
+    import sys
+    exe = shutil.which("ollama") or os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe")
+    if not exe or not os.path.exists(exe):
+        return
+    try:
+        subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         env={**os.environ, "OLLAMA_KEEP_ALIVE": "-1"},
+                         creationflags=0x08000000 if sys.platform == "win32" else 0)
+        for _ in range(16):
+            time.sleep(0.5)
+            if _ollama_activo(None):
+                log.info("Ollama encendido por JARVIS")
+                return
+    except Exception as e:
+        log.info("No pude encender Ollama: %s", e)
 
 
 def _calentar(cliente, modelo):
