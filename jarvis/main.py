@@ -172,7 +172,7 @@ def accion_rapida(texto, herr, cfg):
             return herr.ejecutar("pillgo_estado", {})
         if re.search(r"genera|haz|ejecuta|corre|lanza|arranca|empieza|crea|saca|produce", t):
             return herr.ejecutar("pillgo_videos", {}) + acotacion("videos", cfg, herr, 0.5)
-    m = re.search(r"(?:usa|pon|cambia(?: a)?)\s+(?:la\s+)?voz\s+(?:de\s+|del\s+)?(george|mayordomo|elevenlabs|kokoro|andrew|jorge|[aá]lvaro|espa[nñ]ol de espa[nñ]a|local|offline)", t)
+    m = re.search(r"(?:usa|pon|cambia(?: a)?)\s+(?:la\s+)?voz\s+(?:de\s+|del\s+)?(george|mayordomo|eleven ?labs|kokoro|andrew|jorge|[aá]lvaro|espa[nñ]ol de espa[nñ]a|local|offline)", t)
     if m:
         nombre = {"andrew": "en-US-AndrewMultilingualNeural", "jorge": "es-MX-JorgeNeural", "alvaro": "es-ES-AlvaroNeural",
                   "álvaro": "es-ES-AlvaroNeural", "español de españa": "es-ES-AlvaroNeural",

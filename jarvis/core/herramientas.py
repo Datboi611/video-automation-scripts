@@ -704,8 +704,8 @@ class Herramientas:
                 self.cfg["voz"]["motor"] = "clon"
                 config.guardar_valor(["voz", "motor"], "clon")
                 return "Voz de George en español activada, generada en su PC: gratis y sin límite."
-            if not self.cfg["voz"].get("elevenlabs_api_key"):
-                return "Para la voz de George gratis, ejecute instalar_voz_george.bat en la carpeta de JARVIS."
+            return ("La voz de George gratis aún no está instalada: ejecute instalar_voz_george.bat en la carpeta de "
+                    "JARVIS y vuelva a pedírmelo. (Si prefiere la de pago, diga «usa la voz de ElevenLabs».)")
         if "george" in v or "elevenlabs" in v or "mayordomo" in v:
             if not self.cfg["voz"].get("elevenlabs_api_key"):
                 self.pedir_dato("elevenlabs_api_key")
