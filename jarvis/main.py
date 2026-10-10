@@ -805,8 +805,20 @@ class Jarvis:
             self.estado("escuchando")
             return False
         limpio = texto.lower().strip(" .!¡?¿,")
+        # respuesta rápida: la frase se corta con poco silencio; si quedó a medias («pon la canción de…»),
+        # se guarda y se une con lo que diga enseguida en vez de responder algo incompleto
+        previo = getattr(self, "_a_medias", "")
+        if previo and time.time() - getattr(self, "_a_medias_t", 0) < 8:
+            texto, limpio = previo + " " + texto, (previo + " " + texto).lower().strip(" .!¡?¿,")
+        self._a_medias = ""
+        if re.search(r"\b(y|que|de|del|la|el|los|las|a|en|para|pero|con|por|porque|o|un|una|mi|tu|su|como|cuando|si)$", limpio) \
+                or texto.rstrip().endswith(("...", "…", ",")):
+            self._a_medias, self._a_medias_t = texto.rstrip(" .…,"), time.time()
+            self.estado("escuchando")
+            return "seguir"
         musica = self.herramientas.musica
-        if musica and musica.sonando and "jarvis" not in limpio:
+        modo_palabra = self.cfg["activacion"].get("requiere_palabra", True)
+        if musica and musica.sonando and "jarvis" not in limpio and not modo_palabra:
             return False  # con música sonando, el micrófono oye la canción: solo respondo si me llaman
         if any(f in limpio for f in ("descansa", "duérmete", "duermete", "modo reposo", "go to sleep", "sleep mode")):
             self.ui("addMsg", "usuario", texto)

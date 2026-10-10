@@ -334,7 +334,9 @@ class Escucha:
                     audio = self._grabar(espera_max=espera)
                     if audio is None:
                         break
-                    self.on_comando(audio)
+                    if self.on_comando(audio) == "seguir":  # frase a medias: sigo grabando sin esperar respuesta
+                        espera = 6
+                        continue
                     self.ultimo = time.time()
                     if self.rec:
                         self.rec.Reset()

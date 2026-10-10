@@ -62,21 +62,21 @@ class Oido:
         wav = _wav(audio)
         if self.cfg.get("idioma", "es") == "en":
             r = self._groq.audio.transcriptions.create(
-                model="whisper-large-v3", file=("voz.wav", wav), language="en", prompt=VOCABULARIO, temperature=0)
+                model="whisper-large-v3-turbo", file=("voz.wav", wav), language="en", prompt=VOCABULARIO, temperature=0)
             return r.text, "en"
         if self.cfg.get("idioma", "es") == "es":
             r = self._groq.audio.transcriptions.create(
-                model="whisper-large-v3", file=("voz.wav", wav), language="es", prompt=VOCABULARIO, temperature=0)
+                model="whisper-large-v3-turbo", file=("voz.wav", wav), language="es", prompt=VOCABULARIO, temperature=0)
             return r.text, "es"
         r = self._groq.audio.transcriptions.create(
-            model="whisper-large-v3", file=("voz.wav", wav), response_format="verbose_json",
+            model="whisper-large-v3-turbo", file=("voz.wav", wav), response_format="verbose_json",
             prompt=VOCABULARIO, temperature=0,
         )
         idioma = (getattr(r, "language", "") or "").lower()
         if idioma not in ("es", "spanish", "en", "english"):
             # idioma raro = probablemente entendió mal: se fuerza español
             r = self._groq.audio.transcriptions.create(
-                model="whisper-large-v3", file=("voz.wav", wav), language="es", prompt=VOCABULARIO, temperature=0)
+                model="whisper-large-v3-turbo", file=("voz.wav", wav), language="es", prompt=VOCABULARIO, temperature=0)
             idioma = "es"
         return r.text, idioma
 
