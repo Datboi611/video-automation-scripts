@@ -110,7 +110,7 @@ def accion_rapida(texto, herr, cfg):
             herr.ejecutar("abrir_web", {"url": SITIOS.get(destino, destino)})
         else:
             r = herr.ejecutar("abrir_aplicacion", {"nombre": destino})
-            if r.startswith("No encontr"):
+            if r.startswith(("No encontr", "Error")):
                 return None  # que lo resuelva la IA
         return f"Abriendo {destino}, {j}." + acotacion("abrir", cfg, herr)
     # playlists: SIEMPRE en Apple Music, salvo que pida otro sitio (YouTube, Spotify...)
