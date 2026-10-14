@@ -100,11 +100,12 @@ class Voz:
             if self.cfg["motor"] in ("edge", "elevenlabs", "kokoro", "clon"):
                 elegida = self.cfg.get("voz_en") if idioma == "en" else self.cfg["voz"]
                 respaldo = "en-GB-RyanNeural" if idioma == "en" else "es-ES-AlvaroNeural"
-                for voz in dict.fromkeys([elegida, respaldo]):
+                for voz in [elegida, elegida, respaldo]:  # reintenta la elegida (al arrancar a veces aún no hay red)
                     try:
                         return self._por_frases(texto, lambda t, v=voz: self._generar(t, v))
                     except Exception as e:
                         log.warning("edge-tts falló con %s: %s", voz, e)
+                        time.sleep(0.8)
             if self.cfg["motor"] != "kokoro":  # sin internet: voz neuronal local antes que la robótica de Windows
                 try:
                     return self._por_frases(texto, self._generar_kokoro)
@@ -296,10 +297,11 @@ class Voz:
         except Exception:
             pass
         motor = pyttsx3.init()
-        for v in motor.getProperty("voices"):
-            if "spanish" in v.name.lower() or "español" in v.name.lower() or "es-" in v.id.lower():
-                motor.setProperty("voice", v.id)
-                break
+        es = [v for v in motor.getProperty("voices")
+              if "spanish" in v.name.lower() or "español" in v.name.lower() or "es-" in v.id.lower()]
+        hombre = [v for v in es if re.search(r"pablo|raul|raúl|jorge|alvaro|álvaro|david|male|hombre", v.name, re.I)]
+        if hombre or es:
+            motor.setProperty("voice", (hombre or es)[0].id)
         fin = threading.Event()
 
         def animar():

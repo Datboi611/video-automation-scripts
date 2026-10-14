@@ -322,6 +322,8 @@ class Jarvis:
             self.escucha = Escucha(c, self.estado, self.nivel, self.comando_de_voz, self.despertar)
             self.escucha.on_interrupcion = self.voz.detener
             self.escucha.verificar = self.oido.dice_palabra
+            self.escucha.transcribir_rapido = self.oido.rapido
+            self.escucha.on_texto = self.comando_texto
             modos = ["di «" + c["activacion"]["palabra"].capitalize() + "»" if self.escucha.rec else None,
                      "aplaude dos veces" if c["activacion"]["aplausos"] else None, "toca la esfera"]
             self.ui("setHint", f"Te escucho siempre · tras {c['minutos_reposo']} min sin hablar descanso; "
@@ -802,11 +804,19 @@ class Jarvis:
         elif hablar:
             self.decir(respuesta, idioma)
 
+    def comando_texto(self, texto):
+        """Orden que ya llegó transcrita junto con «Jarvis» («Jarvis, pon mi playlist»)."""
+        self.estado("pensando")
+        return self._manejar_voz(texto, self.cfg.get("idioma", "es") if self.cfg.get("idioma") in ("es", "en") else "es")
+
     def comando_de_voz(self, audio):
         self.estado("pensando")
         texto, idioma = self.oido.transcribir(audio)
         if self.cfg.get("idioma", "es") in ("es", "en"):
             idioma = self.cfg["idioma"]
+        return self._manejar_voz(texto, idioma)
+
+    def _manejar_voz(self, texto, idioma):
         if not texto:
             self.estado("escuchando")
             return False

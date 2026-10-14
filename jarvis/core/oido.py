@@ -115,6 +115,29 @@ class Oido:
             return "", idioma
         return texto, idioma
 
+    def rapido(self, audio):
+        """Transcripción rápida y local (Whisper 'base' en el CPU) para detectar «Jarvis» sin gastar cupo.
+        Si el modelo local no está disponible, usa Groq."""
+        audio = limpiar_audio(audio)
+        try:
+            if getattr(self, "_rap", None) is None:
+                from faster_whisper import WhisperModel
+                self._rap = WhisperModel(self.cfg["stt"].get("modelo_palabra", "base"), device="cpu", compute_type="int8")
+            x = audio.astype(np.float32) / 32768
+            segs, _ = self._rap.transcribe(x[: 16000 * 6], beam_size=1, language="es", vad_filter=False,
+                                           condition_on_previous_text=False, without_timestamps=True)
+            return " ".join(s.text for s in segs)
+        except Exception as e:
+            log.info("Whisper local no disponible para «Jarvis» (%s); uso Groq", e)
+            if not self.key_groq:
+                return ""
+            if self._groq is None:
+                from openai import OpenAI
+                self._groq = OpenAI(api_key=self.key_groq, base_url=config.URLS_PROVEEDOR["groq"], timeout=20)
+            r = self._groq.audio.transcriptions.create(model="whisper-large-v3-turbo", file=("w.wav", _wav(audio)),
+                                                       language="es", temperature=0)
+            return r.text
+
     def dice_palabra(self, audio, patron=r"[jyhg]h?[aáe]r?[bv]i[sz]|jarv|yarv|harv|charv|jarbi|jervi"):
         """Confirma con Whisper (sin pistas de vocabulario, para que no 'invente' la palabra) que de verdad
         se dijo «Jarvis». Evita que un golpe, una tos o la música lo activen."""

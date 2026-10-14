@@ -69,7 +69,9 @@ class Escucha:
         self._previo = collections.deque(maxlen=25)
         self.cola = queue.Queue()
         self.muteado = False
-        self.verificar = None  # función(audio) -> bool: confirma con Whisper que se dijo «Jarvis»  # botón de la interfaz: micrófono apagado
+        self.verificar = None
+        self.transcribir_rapido = None  # función(audio) -> texto (Whisper local) para detectar «Jarvis»
+        self.on_texto = None  # función(texto): orden ya transcrita  # función(audio) -> bool: confirma con Whisper que se dijo «Jarvis»  # botón de la interfaz: micrófono apagado
         self._hist = collections.deque(maxlen=250)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
         self._pre = []
         self._rms_eco = collections.deque(maxlen=300)
@@ -316,20 +318,73 @@ class Escucha:
                 return True
         return False
 
+    def _segmento(self):
+        """Espera la próxima frase (VAD por energía) o un doble aplauso / clic. -> ("voz", audio) | ("aplauso"|"manual", None)"""
+        frames, hablando, silencio, voz = [], False, 0, 0
+        while True:
+            if self._manual.is_set():
+                self._manual.clear()
+                return "manual", None
+            frame = self._leer()
+            if frame is None:
+                continue
+            x = frame.astype(np.float32) / 32768
+            rms = float(np.sqrt(np.mean(x * x)))
+            if self.aplausos and self.aplausos.procesar(x, time.time()):
+                return "aplauso", None
+            umbral = max(self.ruido * (3.0 if not hablando else 2.0), 0.010 if not hablando else 0.007)
+            if rms > umbral:
+                hablando, silencio, voz = True, 0, voz + 1
+            elif hablando:
+                silencio += 1
+            else:
+                self.ruido = max(0.003, 0.98 * self.ruido + 0.02 * rms)
+            frames = (frames + [frame]) if hablando else (frames + [frame])[-10:]
+            if hablando and (silencio > 17 or len(frames) > 33 * 8):  # 0.5 s de silencio o 8 s máx.
+                if voz >= 8:
+                    return "voz", np.concatenate(frames)
+                frames, hablando, silencio, voz = [], False, 0, 0
+
+    def _esperar_jarvis(self):
+        """Cada frase se transcribe con Whisper (local) y se busca «Jarvis». Devuelve (origen, resto_de_la_frase)."""
+        while True:
+            origen, audio = self._segmento()
+            if origen != "voz":
+                return origen, ""
+            if not self.transcribir_rapido:
+                return "voz", ""
+            try:
+                texto = self.transcribir_rapido(audio) or ""
+            except Exception:
+                log.exception("Transcripción para «Jarvis»")
+                continue
+            m = PALABRA_RE.search(texto)
+            if m:
+                log.info("«Jarvis» detectado en: %r", texto[:80])
+                return "voz", texto[m.end():].strip(" ,.!¡?¿")
+
     def _loop_palabra(self):
         from . import atenuar
         while True:
             try:
                 self.on_estado("dormido")
                 self._cortar.clear()
-                origen = self._esperar_activacion()
+                if self.transcribir_rapido:
+                    origen, resto = self._esperar_jarvis()
+                else:
+                    origen, resto = self._esperar_activacion(), ""
                 log.info("Activado por %s", origen)
                 self._cortar.clear()
                 self._interrumpir_si_habla()
-                self._conservar_frase()
                 atenuar.bajar()
-                beep()  # solo un tono: así puede hablar de inmediato
                 espera = 8
+                if len(resto.split()) >= 2 and self.on_texto:  # «Jarvis, pon mi playlist» de corrido: directo
+                    self.on_texto(resto)
+                    if self._esperar_fin_respuesta():
+                        beep()
+                    espera = 6
+                else:
+                    beep()  # solo un tono: así puede hablar de inmediato
                 while True:  # conversación: tras cada respuesta queda unos segundos escuchando
                     self.on_estado("escuchando")
                     audio = self._grabar(espera_max=espera)
@@ -357,7 +412,7 @@ class Escucha:
                 time.sleep(1)
 
     def _loop(self):
-        if self.requiere and self.rec:
+        if self.requiere and (self.rec or self.transcribir_rapido):
             return self._loop_palabra()
         """Siempre escuchando. Tras N minutos sin hablar entra en reposo;
         se despierta con «Jarvis», doble aplauso o clic en la esfera."""
@@ -387,6 +442,11 @@ class Escucha:
             except Exception:
                 log.exception("Error en el bucle de escucha")
                 time.sleep(1)
+
+
+PALABRA_RE = __import__("re").compile(
+    r"\b(?:oye\s+|hey\s+|ok\s+)?(?:j|y|h|g|ch|sh)[ae]r?[bv]+[iy]s+\b|\bjarvi\b|\bjarvis\w*|\bjervis\b|\bjavis\b|\btravis\b",
+    __import__("re").I)
 
 
 def pico_ok(esc):
