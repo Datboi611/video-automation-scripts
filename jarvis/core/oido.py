@@ -100,15 +100,19 @@ class Oido:
     def transcribir(self, audio):
         """Devuelve (texto, idioma) con idioma 'es' o 'en'."""
         audio = limpiar_audio(audio)
-        if self.motor == "groq":
+        self.ultimo_error = ""
+        texto, idioma = "", "es"
+        intentos = ([self._transcribir_groq] if self.motor == "groq" else []) + [self._transcribir_local,
+                                                                                 lambda a: (self.rapido(a), "es")]
+        for intento in intentos:  # Groq -> Whisper local -> Whisper local rápido: nunca se queda sin oír
             try:
-                texto, idioma = self._transcribir_groq(audio)
+                texto, idioma = intento(audio)
+                if texto and texto.strip():
+                    break
             except Exception as e:
-                log.warning("Groq STT falló (%s), uso modelo local", e)
-                texto, idioma = self._transcribir_local(audio)
-        else:
-            texto, idioma = self._transcribir_local(audio)
-        texto = texto.strip()
+                self.ultimo_error = str(e)[:150]
+                log.warning("Transcripción falló (%s); pruebo la siguiente", e)
+        texto = (texto or "").strip()
         idioma = "en" if idioma.lower() in ("en", "english") else "es"
         bajo = texto.lower()
         if len(texto) < 2 or any(a in bajo for a in ALUCINACIONES) and len(texto) < 40:

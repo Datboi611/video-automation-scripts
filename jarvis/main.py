@@ -835,6 +835,10 @@ class Jarvis:
         return self._manejar_voz(texto, idioma)
 
     def _manejar_voz(self, texto, idioma):
+        if texto:
+            self.ui("setHint", f"Oí: «{texto[:70]}»")
+        elif getattr(self.oido, "ultimo_error", ""):
+            self.ui("setHint", "No pude transcribir: " + self.oido.ultimo_error[:90])
         if not texto:
             self.estado("escuchando")
             return False
@@ -852,7 +856,8 @@ class Jarvis:
             return "seguir"
         musica = self.herramientas.musica
         modo_palabra = self.cfg["activacion"].get("requiere_palabra", True)
-        if musica and musica.sonando and "jarvis" not in limpio and not modo_palabra:
+        from core import atenuar
+        if musica and musica.sonando and atenuar.hay_audio() and "jarvis" not in limpio and not modo_palabra:
             return False  # con música sonando, el micrófono oye la canción: solo respondo si me llaman
         if any(f in limpio for f in ("descansa", "duérmete", "duermete", "modo reposo", "go to sleep", "sleep mode")):
             self.ui("addMsg", "usuario", texto)
