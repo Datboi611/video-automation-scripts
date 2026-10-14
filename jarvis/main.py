@@ -333,6 +333,9 @@ class Jarvis:
             self.escucha.verificar = self.oido.dice_palabra
             self.escucha.transcribir_rapido = self.oido.rapido
             self.escucha.on_texto = self.comando_texto
+            self.escucha.on_oido = lambda t: self.ui("setHint", f"Oí: «{t[:70]}»  ·  diga «Jarvis» y su orden")
+            threading.Thread(target=lambda: self.oido.rapido(__import__("numpy").zeros(16000, "int16")),
+                             daemon=True).start()  # precarga el reconocedor local para que el primer «Jarvis» no tarde
             self.ui("setHint", "Diga «Jarvis» y su orden (o aplauda dos veces / toque la esfera)")
         except Exception as e:
             log.exception("Micrófono no disponible")

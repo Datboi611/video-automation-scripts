@@ -71,7 +71,8 @@ class Escucha:
         self.muteado = False
         self.verificar = None
         self.transcribir_rapido = None  # función(audio) -> texto (Whisper local) para detectar «Jarvis»
-        self.on_texto = None  # función(texto): orden ya transcrita  # función(audio) -> bool: confirma con Whisper que se dijo «Jarvis»  # botón de la interfaz: micrófono apagado
+        self.on_texto = None  # función(texto): orden ya transcrita
+        self.on_oido = None  # función(texto): muestra en pantalla lo que oyó (diagnóstico)  # función(audio) -> bool: confirma con Whisper que se dijo «Jarvis»  # botón de la interfaz: micrófono apagado
         self._hist = collections.deque(maxlen=250)  # ~2 s de audio leído (para no perder lo dicho tras «Jarvis»)
         self._pre = []
         self._rms_eco = collections.deque(maxlen=300)
@@ -332,7 +333,8 @@ class Escucha:
             rms = float(np.sqrt(np.mean(x * x)))
             if self.aplausos and self.aplausos.procesar(x, time.time()):
                 return "aplauso", None
-            umbral = max(self.ruido * (3.0 if not hablando else 2.0), 0.010 if not hablando else 0.007)
+            self.on_nivel(min(1.0, rms * 12))  # la esfera reacciona: se ve que el micrófono sí llega
+            umbral = max(self.ruido * (2.5 if not hablando else 1.8), 0.006 if not hablando else 0.004)
             if rms > umbral:
                 hablando, silencio, voz = True, 0, voz + 1
             elif hablando:
@@ -358,6 +360,9 @@ class Escucha:
             except Exception:
                 log.exception("Transcripción para «Jarvis»")
                 continue
+            log.info("Oí (esperando «Jarvis»): %r", texto[:80])
+            if texto.strip() and self.on_oido:
+                self.on_oido(texto.strip())
             m = PALABRA_RE.search(texto)
             if m:
                 log.info("«Jarvis» detectado en: %r", texto[:80])
