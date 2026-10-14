@@ -205,6 +205,8 @@ def accion_rapida(texto, herr, cfg):
     if re.search(r"\b(conecta|vincula|configura|enlaza)\b.*\b(iphone|tel[eé]fono|celular|telegram|bot|m[oó]vil)\b", t) \
             and not re.search(r"llam", t):
         bot = getattr(herr, "bot", None)
+        if (not bot or not bot.activo) and cfg.get("telegram_bot", {}).get("token"):
+            return f"El bot ya tiene su token guardado, {j}; se reconecta solo en cuanto haya internet."
         if not bot or not bot.activo:
             herr.ejecutar("pedir_dato", {"campo": "telegram_bot_token"})
             return f"Pegue en la barra el token que le dio BotFather, {j}. Lo demás lo hago yo."

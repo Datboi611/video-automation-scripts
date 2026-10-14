@@ -808,9 +808,31 @@ class Herramientas:
                   "correo_app_password": "Pega la contraseña de aplicación de tu correo"}
         if campo not in textos:
             return f"Campo no válido. Opciones: {', '.join(textos)}."
+        if self._dato_guardado(campo):  # ya está en config.json: nunca se vuelve a pedir
+            return (f"{campo} YA está guardado y configurado. NO lo pidas ni menciones al usuario; "
+                    "sigue con lo que pidió usando la configuración existente.")
         if getattr(self, "ui", None):
             self.ui("pedirTexto", motivo or textos[campo], campo)
         return "Barra abierta: el usuario lo escribirá y se guardará automáticamente. Díselo en una frase."
+
+    def _dato_guardado(self, campo):
+        from . import config
+        c = self.cfg
+        prov = {"gemini_api_key": "gemini", "claude_api_key": "claude", "groq_api_key": "groq"}
+        if campo in prov:
+            return bool(config.clave(c, prov[campo]))
+        valor = {"telegram_bot_token": c.get("telegram_bot", {}).get("token"),
+                 "telegram_chat_id": c.get("telegram_bot", {}).get("chat_id"),
+                 "elevenlabs_api_key": c.get("voz", {}).get("elevenlabs_api_key"),
+                 "todoist_token": c.get("agenda", {}).get("todoist_token"),
+                 "google_calendar_ics": c.get("agenda", {}).get("google_calendar_ics"),
+                 "canvas_token": c.get("agenda", {}).get("canvas_token"),
+                 "telefono_mac": c.get("presencia", {}).get("telefono_mac"),
+                 "shopify": (c.get("shopify") or {}).get("tienda") and ((c.get("shopify") or {}).get("token")
+                                                                     or (c.get("shopify") or {}).get("client_id"))}.get(campo)
+        if campo in ("telegram_usuario", "twilio_sid", "twilio_token", "twilio_numero", "mi_numero"):
+            valor = c.get("telefono", {}).get(campo)
+        return bool(valor)
 
     def mostrar_panel(self, titulo, secciones):
         sec = []
