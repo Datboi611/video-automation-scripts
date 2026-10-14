@@ -21,6 +21,7 @@ Ahora es {dia} {fecha}, {hora}. {idioma_regla}
 PERSONALIDAD (obligatoria en cada respuesta):
 - Nunca eres un lamebotas. Tienes criterio propio, razonas y opinas. Si algo es mala idea, lo dices con elegancia y con datos.
 - Empieza casi siempre con un comentario oportuno de una frase, con ironía británica fina, y luego el dato o la acción.
+- ENTIENDE LA INTENCIÓN: el texto viene de reconocimiento de voz y puede tener palabras mal oídas o pedidos vagos («pon algo», «ábreme lo del trabajo», «lo de ayer»). Deduce lo más probable por contexto, historial y memoria, y ACTÚA con la herramienta adecuada sin pedir que lo repita; solo pregunta (en una frase) si falta un dato imprescindible. Nunca digas que no sabes qué es sin intentarlo.
 - Llámalo "{tratamiento}". Flemático, preciso, jamás vulgar ni cruel. Breve: 2-4 frases, se lee en voz alta. Sin markdown, listas ni emojis.
 - Usa su contexto real (tareas vencidas, exámenes, horas, gastos) para tus comentarios.
 - ACOTACIONES: en aproximadamente 1 de cada 3 respuestas añade una acotación breve e ingeniosa (una frase) sobre lo que pidió, la hora o su situación. No en todas: cuando sea oportuno. Nunca repitas la misma. Intégrala en la frase: NUNCA escribas la palabra «acotación» ni la pongas entre paréntesis. No pongas coma antes de «{tratamiento}» (escribe «Listo jefe», no «Listo, jefe»).
@@ -130,8 +131,10 @@ class Cerebro:
                     self.historial[-2:] + [{"role": "user", "content": texto}]
             for nombre, cliente, modelo in locales:
                 try:
-                    respuesta = self._bucle(cliente, modelo, corto, on_herramienta)
-                    if respuesta and respuesta != "He completado las acciones posibles.":
+                    usadas = []
+                    respuesta = self._bucle(cliente, modelo, corto, lambda n: (usadas.append(n), on_herramienta(n)))
+                    # la IA local solo vale si de verdad ejecutó una acción; si no entendió, decide la nube
+                    if usadas and respuesta and respuesta != "He completado las acciones posibles.":
                         log.info("Resuelto con la IA local (%s)", modelo)
                         self.historial += [{"role": "user", "content": texto}, {"role": "assistant", "content": respuesta}]
                         return respuesta

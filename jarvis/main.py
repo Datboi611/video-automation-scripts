@@ -324,10 +324,7 @@ class Jarvis:
             self.escucha.verificar = self.oido.dice_palabra
             self.escucha.transcribir_rapido = self.oido.rapido
             self.escucha.on_texto = self.comando_texto
-            modos = ["di «" + c["activacion"]["palabra"].capitalize() + "»" if self.escucha.rec else None,
-                     "aplaude dos veces" if c["activacion"]["aplausos"] else None, "toca la esfera"]
-            self.ui("setHint", f"Te escucho siempre · tras {c['minutos_reposo']} min sin hablar descanso; "
-                               "para despertarme: " + ", ".join(m for m in modos if m))
+            self.ui("setHint", "Diga «Jarvis» y su orden (o aplauda dos veces / toque la esfera)")
         except Exception as e:
             log.exception("Micrófono no disponible")
             self.ui("setHint", "Micrófono no disponible. Puedes escribirme.")
@@ -354,7 +351,9 @@ class Jarvis:
             self.ui("pedirTexto", "Falta tu clave de Groq en config.json")
         h = dt.datetime.now().hour
         saludo = "Buenos días" if 5 <= h < 12 else "Buenas tardes" if h < 20 else "Buenas noches"
-        self.decir(f"{saludo}, {c['tratamiento']}. Todos los sistemas operativos. Le escucho.")
+        # el saludo va aparte para no retrasar la escucha (y por si la voz tarda en cargar)
+        threading.Thread(target=self.decir, args=(f"{saludo} {c['tratamiento']}. JARVIS en línea; "
+                                                  "dígame «Jarvis» cuando me necesite.",), daemon=True).start()
         try:
             self.escucha.iniciar()
         except Exception:
