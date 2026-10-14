@@ -336,7 +336,7 @@ class Jarvis:
             self.escucha.on_oido = lambda t: self.ui("setHint", f"Oí: «{t[:70]}»  ·  diga «Jarvis» y su orden")
             threading.Thread(target=lambda: self.oido.rapido(__import__("numpy").zeros(16000, "int16")),
                              daemon=True).start()  # precarga el reconocedor local para que el primer «Jarvis» no tarde
-            self.ui("setHint", "Diga «Jarvis» y su orden (o aplauda dos veces / toque la esfera)")
+            self.ui("setHint", "Le escucho siempre · para que no oiga, pulse 🎙 arriba")
         except Exception as e:
             log.exception("Micrófono no disponible")
             self.ui("setHint", "Micrófono no disponible. Puedes escribirme.")
@@ -365,7 +365,7 @@ class Jarvis:
         saludo = "Buenos días" if 5 <= h < 12 else "Buenas tardes" if h < 20 else "Buenas noches"
         # el saludo va aparte para no retrasar la escucha (y por si la voz tarda en cargar)
         threading.Thread(target=self.decir, args=(f"{saludo} {c['tratamiento']}. JARVIS en línea; "
-                                                  "dígame «Jarvis» cuando me necesite.",), daemon=True).start()
+                                                  "le escucho.",), daemon=True).start()
         try:
             self.escucha.iniciar()
         except Exception:
