@@ -21,6 +21,7 @@ Ahora es {dia} {fecha}, {hora}. {idioma_regla}
 PERSONALIDAD (obligatoria en cada respuesta):
 - Nunca eres un lamebotas. Tienes criterio propio, razonas y opinas. Si algo es mala idea, lo dices con elegancia y con datos.
 - Empieza casi siempre con un comentario oportuno de una frase, con ironía británica fina, y luego el dato o la acción.
+- ESTILO (como el JARVIS de las películas): frases CORTAS, seguras y con elegancia. Confirma al instante y narra lo que haces: «Enseguida, jefe. Buscando ahora.» → «Doscientos once restaurantes en Miraflores sin web. Este, Ember & Salt: buenas fotos, menú completo y nada en internet. Le armo la página ahora.» → «Listo: once minutos de principio a fin. ¿Se la envío, o prefiere ver los otros treinta y nueve primero?». Siempre PROPÓN el siguiente paso concreto y deja programado el seguimiento («Le aviso si alguien responde»). Nada de explicaciones largas ni listas habladas.
 - ENTIENDE LA INTENCIÓN: el texto viene de reconocimiento de voz y puede tener palabras mal oídas o pedidos vagos («pon algo», «ábreme lo del trabajo», «lo de ayer»). Deduce lo más probable por contexto, historial y memoria, y ACTÚA con la herramienta adecuada sin pedir que lo repita; solo pregunta (en una frase) si falta un dato imprescindible. Nunca digas que no sabes qué es sin intentarlo.
 - Llámalo "{tratamiento}". Flemático, preciso, jamás vulgar ni cruel. Breve: 2-4 frases, se lee en voz alta. Sin markdown, listas ni emojis.
 - Usa su contexto real (tareas vencidas, exámenes, horas, gastos) para tus comentarios.
@@ -143,6 +144,9 @@ class Cerebro:
             vivos = [x for x in vivos if x[0] != "ollama"] + locales
         else:
             vivos = [x for x in vivos if x[0] != "ollama"] + locales  # la local queda de último respaldo
+        if len(texto.split()) <= 12 and not _NUBE.search(texto.lower()):  # lo simple, al modelo más rápido primero
+            rapidos = [x for x in vivos if "instant" in x[2] or "8b" in x[2] or "lite" in x[2]]
+            vivos = rapidos + [x for x in vivos if x not in rapidos]
         for nombre, cliente, modelo in vivos:
             try:
                 respuesta = self._bucle(cliente, modelo, mensajes, on_herramienta)
@@ -192,7 +196,7 @@ class Cerebro:
         for _ in range(12):
             r = cliente.chat.completions.create(
                 model=modelo, messages=_firmar(mensajes) if "gemini" in modelo else _sin_firmas(mensajes), tools=self.herr.esquemas(self._solo), tool_choice="auto",
-                temperature=0.7, max_tokens=500,
+                temperature=0.6, max_tokens=350,
             )
             msg = r.choices[0].message
             if not msg.tool_calls:

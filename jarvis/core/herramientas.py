@@ -143,6 +143,10 @@ SPECS = [
     ("recordar_dato", "Guarda un dato duradero del usuario.", {"dato": (S, "Dato")}),
     ("olvidar_dato", "Borra un dato de memoria.", {"texto": (S, "Texto")}),
     ("notificar_telefono", "Notificación push al teléfono.", {"mensaje": (S, "Mensaje")}),
+    ("crear_sitio_web", "Construye un SITIO WEB completo (una página moderna, responsive, con sus fotos, menú/servicios, ubicación y botón de reservas/WhatsApp) para un negocio o proyecto, y lo abre en el navegador al terminar. Trabaja en segundo plano.",
+     {"negocio": (S, "Nombre del negocio o proyecto"), "detalles": (S, "Todo lo que se sepa: rubro, zona, dirección, link de Google Maps/Instagram, estilo, colores")}, ["negocio"]),
+    ("prospectar_negocios", "Busca en internet negocios de un rubro y zona (p. ej. restaurantes en Miraflores SIN página web), arma la lista con contacto y la guarda; opcionalmente les construye un sitio de muestra a los mejores. Trabaja en segundo plano.",
+     {"rubro": (S, "Tipo de negocio"), "zona": (S, "Ciudad o barrio"), "criterio": (S, "p. ej. 'sin página web'"), "sitios_de_muestra": ("integer", "Cuántos sitios de muestra construir (0 = ninguno)")}, ["rubro", "zona"]),
     ("llamar_contacto", "Llama por teléfono a un CONTACTO del usuario (mamá, Juan, etc.) y le da un recado con la voz de JARVIS; si responde, se lo pasa al usuario. Redacta el recado en 3ª persona, de parte del usuario.",
      {"nombre": (S, "Nombre del contacto"), "mensaje": (S, "Recado completo que JARVIS dirá")}),
     ("importar_contactos", "Importa los contactos del usuario desde un archivo .vcf (busca el más reciente en Descargas/Escritorio/Documentos).", {}),
@@ -158,7 +162,7 @@ SPECS = [
 
 
 # Categorías: a cada pedido solo se envían las herramientas relevantes (ahorra tokens y límites gratis)
-NUCLEO = {"pillgo_videos", "pillgo_estado", "pillgo_parar", "pillgo_reparar", "pillgo_reanudar", "pillgo_reset_flow", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
+NUCLEO = {"crear_sitio_web", "prospectar_negocios", "pillgo_videos", "pillgo_estado", "pillgo_parar", "pillgo_reparar", "pillgo_reanudar", "pillgo_reset_flow", "diagnostico", "delegar_a_claude", "pedir_dato", "mostrar_panel", "pedir_texto", "marcar_hecho", "ver_pantalla", "ejecutar_powershell", "ejecutar_python", "abrir_aplicacion", "recordar_dato",
           "crear_habilidad", "usar_habilidad", "investigar_web", "crear_recordatorio", "resumen_del_dia"}
 CATEGORIAS = {
     "agenda": (r"tengo|pendiente|tarea|deber|agenda|calendario|horario|evento|record|alarma|todoist|hoy|mañana|semana|"
@@ -895,6 +899,31 @@ class Herramientas:
 
     def delegar_a_claude(self, tarea, carpeta=None):
         return self.claude.delegar(tarea, carpeta)
+
+    def crear_sitio_web(self, negocio, detalles=""):
+        import re as _re
+        slug = _re.sub(r"[^a-z0-9]+", "-", negocio.lower()).strip("-")[:40] or "sitio"
+        carpeta = os.path.join(os.path.expanduser("~"), "Documents", "JARVIS_sitios", slug)
+        os.makedirs(carpeta, exist_ok=True)
+        tarea = (f"Construye un sitio web profesional de una sola página para «{negocio}». Datos: {detalles or 'búscalos'}. "
+                 "Primero investiga en internet al negocio (Google Maps, Instagram, reseñas) y usa sus datos reales: "
+                 "nombre, dirección, horario, platos/servicios y precios si los hay, y enlaza sus fotos públicas. "
+                 f"Escribe todo en {carpeta}\\index.html (HTML+CSS en un solo archivo, moderno, elegante, responsive, "
+                 "en español, con sección hero, menú/servicios, galería, reseñas, ubicación con mapa embebido y botón "
+                 "de reservas por WhatsApp). Al terminar ábrelo en el navegador predeterminado con: start \"\" index.html")
+        r = self.claude.delegar(tarea, carpeta)
+        return r if "no está instalado" in r else f"Construyendo el sitio de {negocio}; le aviso y se lo abro al terminar."
+
+    def prospectar_negocios(self, rubro, zona, criterio="sin página web", sitios_de_muestra=0):
+        carpeta = os.path.join(os.path.expanduser("~"), "Documents", "JARVIS_prospectos")
+        os.makedirs(carpeta, exist_ok=True)
+        tarea = (f"Busca en internet {rubro} en {zona} que cumplan: {criterio}. Arma una lista de hasta 40 con nombre, "
+                 "dirección, teléfono/WhatsApp, Instagram, calificación y por qué son buen prospecto. Guárdala en "
+                 f"{carpeta}\\{rubro}_{zona}.csv (separador ;) y ábrela al terminar." +
+                 (f" Después, para los {int(sitios_de_muestra)} mejores, construye un sitio de muestra de una página "
+                  "(index.html moderno con sus datos y fotos reales) en una subcarpeta con su nombre." if sitios_de_muestra else ""))
+        r = self.claude.delegar(tarea, carpeta)
+        return r if "no está instalado" in r else f"Buscando {rubro} en {zona} ({criterio}); le paso la lista al terminar."
 
 
     def canvas(self, que="pendientes"):

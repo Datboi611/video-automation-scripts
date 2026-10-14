@@ -54,6 +54,15 @@ def guardar_preferencia(texto, memoria):
         memoria.agregar(f"Instrucción del usuario: {texto}")
 
 
+NARRACION = {  # acuse inmediato mientras trabaja, como el JARVIS de las películas
+    "buscar_en_internet": "Buscando ahora, {j}.", "leer_pagina": "Revisando la página.",
+    "crear_sitio_web": "Enseguida, {j}. Lo construyo ahora.", "prospectar_negocios": "Enseguida, {j}. Buscando ahora.",
+    "delegar_a_claude": "En ello, {j}.", "ver_pantalla": "Echando un vistazo.", "correo": "Revisando su correo.",
+    "enviar_correo": "Enviando.", "canvas": "Consultando Canvas.", "shopify_ventas": "Mirando la tienda.",
+    "llamar_contacto": "Llamando.", "resumen_del_dia": "Repasando su agenda.", "pillgo_videos": "Lanzando la tanda.",
+}
+
+
 def respuesta_rapida(texto, idioma, cfg):
     """Respuestas instantáneas sin IA para lo más común."""
     t = texto.lower()
@@ -720,9 +729,16 @@ class Jarvis:
             if not respuesta:
                 self.estado("pensando")
                 guardar_preferencia(texto, self.memoria)
-                respuesta = self.cerebro.responder(
-                    texto, on_herramienta=lambda n: self.ui("proceso", pid, texto, n.replace("_", " ")),
-                    idioma=idioma)
+                narrado = set()
+
+                def avance(n):  # narra en voz alta lo que va haciendo (una vez por tipo de acción)
+                    self.ui("proceso", pid, texto, n.replace("_", " "))
+                    frase = NARRACION.get(n)
+                    if hablar and frase and frase not in narrado and len(narrado) < 2:
+                        narrado.add(frase)
+                        threading.Thread(target=self.decir, args=(frase.format(j=self.cfg["tratamiento"]), idioma),
+                                         daemon=True).start()
+                respuesta = self.cerebro.responder(texto, on_herramienta=avance, idioma=idioma)
                 error = self.cerebro.hubo_error or not respuesta
         except Exception:
             log.exception("Fallo procesando")
