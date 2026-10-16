@@ -44,9 +44,7 @@ class DetectorAplausos:
 
     def __init__(self, umbral=0.30):
         self.umbral = umbral
-        self.ruido = 0.004
-        self._hablando_desde = 0
-        self._nivel_max, self._nivel_t = 0.0, time.time()
+        self.ruido = 0.01
         self.en_pico = False
         self.frames_pico = 0
         self.inicio_pico = 0.0
@@ -112,7 +110,9 @@ class Escucha:
         self.palabra = act["palabra"].lower().strip()
         self.requiere = act.get("requiere_palabra", True)  # cada conversación empieza diciendo «Jarvis»
         self.rec = self._crear_reconocedor(act["modelo_vosk"])
-        self.ruido = 0.01
+        self.ruido = 0.004
+        self._hablando_desde = 0
+        self._nivel_max, self._nivel_t = 0.0, time.time()
 
     def _crear_reconocedor(self, ruta):
         try:
