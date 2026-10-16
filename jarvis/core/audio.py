@@ -153,7 +153,7 @@ class Escucha:
             return
         frame = datos[:, 0].copy()
         if self.silencio.is_set():
-            self._hablando_desde = self._hablando_desde or time.time()
+            self._hablando_desde = getattr(self, "_hablando_desde", 0) or time.time()
             if time.time() - self._hablando_desde > 60:
                 log.warning("La voz quedó colgada más de 60 s: vuelvo a escuchar")
                 self.silencio.clear()
