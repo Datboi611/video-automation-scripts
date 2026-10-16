@@ -20,7 +20,9 @@ class DetectorAplausos:
 
     def __init__(self, umbral=0.30):
         self.umbral = umbral
-        self.ruido = 0.01
+        self.ruido = 0.004
+        self._hablando_desde = 0
+        self._nivel_max, self._nivel_t = 0.0, time.time()
         self.en_pico = False
         self.frames_pico = 0
         self.inicio_pico = 0.0
@@ -126,6 +128,13 @@ class Escucha:
         if self.muteado:
             return
         frame = datos[:, 0].copy()
+        if self.silencio.is_set():
+            self._hablando_desde = self._hablando_desde or time.time()
+            if time.time() - self._hablando_desde > 60:
+                log.warning("La voz quedó colgada más de 60 s: vuelvo a escuchar")
+                self.silencio.clear()
+        else:
+            self._hablando_desde = 0
         if (self.requiere and self.rec) or not self.silencio.is_set():
             # en modo «Jarvis», el micrófono sigue escuchando aunque JARVIS hable: decir «Jarvis» lo corta
             self._eco_frames = 0
@@ -277,14 +286,20 @@ class Escucha:
             x = frame.astype(np.float32) / 32768
             rms = float(np.sqrt(np.mean(x * x)))
             # al empezar a hablar exige más volumen; ya hablando, basta con voz suave (pausas, finales de frase)
-            umbral = max(self.ruido * (3.5 if not hablando else 2.2), 0.012 if not hablando else 0.008)
+            umbral = max(self.ruido * (3.0 if not hablando else 2.0), 0.005 if not hablando else 0.0035)
             self.on_nivel(min(1.0, rms * 12))
+            self._nivel_max = max(self._nivel_max, rms)
+            if time.time() - self._nivel_t > 30:  # para el log: ¿llega sonido del micrófono?
+                log.info("Micrófono: nivel máx %.4f, ruido %.4f, umbral %.4f", self._nivel_max, self.ruido, umbral)
+                if self._nivel_max < 0.002:
+                    log.warning("El micrófono no capta casi nada: revise que sea el correcto y que no esté silenciado")
+                self._nivel_max, self._nivel_t = 0.0, time.time()
             if rms > umbral:
                 hablando, silencio, voz = True, 0, voz + 1
             elif hablando:
                 silencio += 1
             else:
-                self.ruido = max(0.003, 0.98 * self.ruido + 0.02 * rms)
+                self.ruido = max(0.0015, 0.98 * self.ruido + 0.02 * rms)
             if hablando or len(frames) < 10:
                 frames.append(frame)
             else:
