@@ -50,7 +50,7 @@ DEFAULTS = {
                         "Single", "Vaunt", "TikTok Songs", "My Shazam Tracks", "Canciones favoritas"],  # "es" = siempre español; "auto" = español o inglés según cómo hables
     "minutos_reposo": 100000,
     "segundos_silencio": 1.2,
-    "interrumpir": True,
+    "interrumpir": False,  # True: cortarle hablando encima (con altavoces su propia voz lo corta)
     "factor_interrupcion": 2.8,
     "vocabulario": "",
     "microfono": None,
@@ -207,6 +207,10 @@ def cargar():
         with open(ruta, encoding="utf-8") as f:
             usuario = json.load(f)
         _migrar(usuario, ruta)
+        if not usuario.get("_eco_v11"):  # con altavoces, su propia voz lo cortaba a la mitad
+            usuario["interrumpir"], usuario["_eco_v11"] = False, True
+            with open(ruta, "w", encoding="utf-8") as f:
+                json.dump(usuario, f, ensure_ascii=False, indent=2)
         _merge(cfg, usuario)
     for p in cfg["llm"]["proveedores"]:
         p["api_key"] = (p.get("api_key") or "").strip()
