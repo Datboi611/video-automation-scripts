@@ -110,8 +110,9 @@ class Escucha:
         self.palabra = act["palabra"].lower().strip()
         self.requiere = act.get("requiere_palabra", True)  # cada conversación empieza diciendo «Jarvis»
         self.rec = self._crear_reconocedor(act["modelo_vosk"])
-        self.ruido = 0.004
+        self.ruido = 0.01
         self._hablando_desde = 0
+        self._fin_voz = 0.0
         self._nivel_max, self._nivel_t = 0.0, time.time()
 
     def _crear_reconocedor(self, ruta):
@@ -158,7 +159,11 @@ class Escucha:
                 log.warning("La voz quedó colgada más de 60 s: vuelvo a escuchar")
                 self.silencio.clear()
         else:
+            if getattr(self, "_hablando_desde", 0):
+                self._fin_voz = time.time()
             self._hablando_desde = 0
+            if time.time() - getattr(self, "_fin_voz", 0) < 1.0:
+                return
         if (self.requiere and self.rec) or not self.silencio.is_set():
             # en modo «Jarvis», el micrófono sigue escuchando aunque JARVIS hable: decir «Jarvis» lo corta
             self._eco_frames = 0
@@ -310,7 +315,7 @@ class Escucha:
             x = frame.astype(np.float32) / 32768
             rms = float(np.sqrt(np.mean(x * x)))
             # al empezar a hablar exige más volumen; ya hablando, basta con voz suave (pausas, finales de frase)
-            umbral = max(self.ruido * (3.0 if not hablando else 2.0), 0.005 if not hablando else 0.0035)
+            umbral = max(self.ruido * (3.5 if not hablando else 2.2), 0.012 if not hablando else 0.008)
             self.on_nivel(min(1.0, rms * 12))
             self._nivel_max = max(self._nivel_max, rms)
             if time.time() - self._nivel_t > 30:  # para el log: ¿llega sonido del micrófono?
@@ -323,13 +328,13 @@ class Escucha:
             elif hablando:
                 silencio += 1
             else:
-                self.ruido = max(0.0015, 0.98 * self.ruido + 0.02 * rms)
+                self.ruido = max(0.003, 0.98 * self.ruido + 0.02 * rms)
             if hablando or len(frames) < 10:
                 frames.append(frame)
             else:
                 frames = frames[-10:] + [frame]  # conserva 300 ms previos
             if hablando and silencio > fin_silencio:
-                if voz < 8:  # ruido corto (golpe, tos): se ignora
+                if voz < 15:  # ruido corto (golpe, tos, eco): se ignora
                     frames, hablando, silencio, voz = [], False, 0, 0
                     continue
                 return np.concatenate(frames)

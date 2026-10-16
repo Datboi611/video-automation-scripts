@@ -12,7 +12,7 @@ log = logging.getLogger("jarvis")
 
 ALUCINACIONES = (
     "gracias por ver", "subtítulos", "amara.org", "suscríbete", "thanks for watching",
-    "thank you for watching", "like and subscribe",
+    "thank you for watching", "like and subscribe", "quién? quién", "tengo que ver",
 )
 
 

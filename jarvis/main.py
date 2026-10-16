@@ -845,6 +845,11 @@ class Jarvis:
             self.estado("escuchando")
             return False
         limpio = texto.lower().strip(" .!¡?¿,")
+        # Whisper inventa palabras sueltas con ruido o eco («¿Quién?», «Dos»): una sola palabra no es una orden
+        if len(limpio.split()) < 2 and limpio not in ("para", "stop", "silencio", "calla", "basta", "descansa", "sí", "si", "no", "gracias"):
+            log.info("Ignoro posible ruido: %r", texto)
+            self.estado("escuchando")
+            return False
         # respuesta rápida: la frase se corta con poco silencio; si quedó a medias («pon la canción de…»),
         # se guarda y se une con lo que diga enseguida en vez de responder algo incompleto
         previo = getattr(self, "_a_medias", "")
