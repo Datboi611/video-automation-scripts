@@ -15,6 +15,30 @@ SR = 16000
 BLOQUE = 480  # 30 ms
 
 
+VIRTUALES = ("iriun", "virtual", "cable", "voicemeeter", "stereo mix", "mezcla est", "droidcam", "obs", "nvidia broadcast")
+
+
+def elegir_microfono(preferido=None):
+    """Micrófono a usar: el de config.json si se indicó; si no, el predeterminado de Windows salvo que sea
+    virtual (Iriun, DroidCam, CABLE...), que no capta nada si su app está cerrada: entonces el primero real."""
+    if preferido is not None:
+        return preferido
+    try:
+        dispositivos = sd.query_devices()
+        defecto = sd.default.device[0]
+        api = dispositivos[defecto]["hostapi"] if defecto is not None and defecto >= 0 else 0
+        if defecto is not None and defecto >= 0 and not any(v in dispositivos[defecto]["name"].lower() for v in VIRTUALES):
+            return None
+        for i, d in enumerate(dispositivos):
+            if d["max_input_channels"] > 0 and d["hostapi"] == api and not any(v in d["name"].lower() for v in VIRTUALES) \
+                    and "asignador" not in d["name"].lower() and "mapper" not in d["name"].lower():
+                log.info("Micrófono predeterminado es virtual (%s); uso %s", dispositivos[defecto]["name"], d["name"])
+                return i
+    except Exception:
+        log.exception("No pude elegir micrófono")
+    return None
+
+
 class DetectorAplausos:
     """Detecta dos aplausos seguidos: picos fuertes y muy cortos sobre el ruido de fondo."""
 
@@ -115,7 +139,7 @@ class Escucha:
     def iniciar(self):
         self.stream = sd.InputStream(
             samplerate=SR, channels=1, dtype="int16", blocksize=BLOQUE,
-            device=self.cfg.get("microfono"), callback=self._callback,
+            device=elegir_microfono(self.cfg.get("microfono")), callback=self._callback,
         )
         self.stream.start()
         threading.Thread(target=self._loop, daemon=True).start()
