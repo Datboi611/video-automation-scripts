@@ -691,6 +691,7 @@ class Jarvis:
             try:
                 self.voz.hablar(texto, idioma)
             finally:
+                self._t_fin_habla, self._ultima_respuesta = time.time(), texto
                 if self.escucha:
                     self.escucha.silencio.clear()
                 self.estado("escuchando" if self.escucha else "reposo")
@@ -861,6 +862,11 @@ class Jarvis:
             self._a_medias, self._a_medias_t = texto.rstrip(" .…,"), time.time()
             self.estado("escuchando")
             return "seguir"
+        if not self._me_hablan(texto, limpio):
+            log.info("No es para mí (conversación, video o TV): %r", texto)
+            self.ui("setHint", f"Ignorado (no era para mí): «{texto[:60]}»")
+            self.estado("escuchando")
+            return False
         musica = self.herramientas.musica
         modo_palabra = self.cfg["activacion"].get("requiere_palabra", True)
         from core import atenuar
@@ -875,6 +881,25 @@ class Jarvis:
         # en segundo plano: sigo escuchando mientras trabajo
         threading.Thread(target=self.procesar, args=(texto,), kwargs={"idioma": idioma}, daemon=True).start()
         return True
+
+    def _me_hablan(self, texto, limpio):
+        """¿Esto va dirigido a JARVIS o es otra conversación, un video o la tele de fondo?"""
+        if re.search(r"\b(jarvis|yarvis|jarvi|travis)\b", limpio):
+            return True
+        en_charla = time.time() - getattr(self, "_t_fin_habla", 0) < 12  # acaba de responder: seguimiento
+        previo = getattr(self, "_ultima_respuesta", "")
+        prompt = ("Eres el filtro de un asistente de voz llamado JARVIS que escucha siempre el micrófono de un PC. "
+                  "El micrófono también capta al usuario hablando con otras personas, llamadas, videos, TikTok, "
+                  "YouTube o la tele de otro dispositivo. Decide si la frase es una orden o pregunta DIRIGIDA AL "
+                  "ASISTENTE (pedirle algo, preguntarle algo, hablarle directamente). Narraciones, diálogos de "
+                  "videos, letras de canciones, frases dirigidas a otra persona o charla sin petición = NO.\n"
+                  + (f"JARVIS acaba de decir: «{previo[:200]}» (una respuesta a eso SÍ es para él).\n" if en_charla and previo else "")
+                  + f"Frase: «{texto}»\nResponde solo SI o NO.")
+        try:
+            r = self.cerebro.completar(prompt, max_tokens=3).upper()
+        except Exception:
+            return True
+        return not r.startswith("NO") if r else True
 
     def despertar(self):
         self.decir(f"¿Sí, {self.cfg['tratamiento']}?")
